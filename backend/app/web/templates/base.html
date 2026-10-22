@@ -1,0 +1,90 @@
+{% macro wordmark() %}{% if shop_name|upper == 'FOODTOR' %}<span class="logo__food">FOOD</span><span class="logo__tor">TOR</span>{% else %}{{ shop_name }}{% endif %}{% endmacro %}{% macro social_links(socials) %}{% if socials.links %}<div class="socials">
+  {% if socials.telegram %}<a href="{{ socials.telegram }}" target="_blank" rel="noopener"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-telegram"/></svg>Telegram</a>{% endif %}
+  {% if socials.instagram %}<a href="{{ socials.instagram }}" target="_blank" rel="noopener"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-instagram"/></svg>Instagram*</a>{% endif %}
+</div>{% endif %}{% endmacro %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{ title or shop_name }}</title>
+  {% if description %}<meta name="description" content="{{ description }}">{% endif %}
+  {% if noindex %}<meta name="robots" content="noindex, follow">{% endif %}
+  <link rel="canonical" href="{{ canonical }}">
+  <meta property="og:site_name" content="{{ shop_name }}">
+  <meta property="og:locale" content="ru_RU">
+  <meta property="og:type" content="{{ og_type or 'website' }}">
+  <meta property="og:url" content="{{ canonical }}">
+  <meta property="og:title" content="{{ title or shop_name }}">
+  <meta name="twitter:card" content="summary_large_image">
+  {% if description %}<meta property="og:description" content="{{ description }}">{% endif %}
+  {% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+  {% if prev_url %}<link rel="prev" href="{{ prev_url }}">{% endif %}
+  {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
+  <meta name="theme-color" content="#0B5D3B">
+  <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+  <script src="{{ asset('js/theme-init.js') }}"></script>
+  <link rel="stylesheet" href="{{ asset('css/shop.css') }}">
+  {% block head %}{% endblock %}
+</head>
+<body data-free-from="{{ free_from }}" data-courier-fee="{{ courier_fee }}" data-express-fee="{{ express_fee }}">
+  <a class="skip" href="#main">К содержимому</a>
+  <header class="header">
+    <div class="wrap header__row">
+      <a class="logo" href="/" aria-label="{{ shop_name }} — на главную">
+        <span class="logo__mark"><svg><use href="{{ asset('icons.svg') }}#i-sprout"/></svg></span>
+        <span class="logo__text">{{ wordmark() }}</span>
+      </a>
+      <a class="btn btn--ghost header__catalog" href="/catalog"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-grid"/></svg>Каталог</a>
+      <form class="search" action="/search" role="search">
+        <svg class="ic"><use href="{{ asset('icons.svg') }}#i-search"/></svg>
+        <input type="search" name="q" value="{{ filters.q if filters is defined else '' }}" placeholder="Искать овощи, фрукты, крупы…" aria-label="Поиск по магазину" autocomplete="off" maxlength="100">
+      </form>
+      <nav class="header__actions" aria-label="Пользователь">
+        <button class="icon-btn" type="button" data-theme-toggle aria-label="Сменить тему">
+          <svg class="ic ic--sun"><use href="{{ asset('icons.svg') }}#i-sun"/></svg>
+          <svg class="ic ic--moon"><use href="{{ asset('icons.svg') }}#i-moon"/></svg>
+        </button>
+        <a class="icon-btn" href="/account" data-account-link aria-label="Личный кабинет">
+          <svg class="ic"><use href="{{ asset('icons.svg') }}#i-user"/></svg><span class="icon-btn__label" data-account-label>Войти</span>
+        </a>
+        <a class="icon-btn icon-btn--cart" href="/cart" aria-label="Корзина">
+          <svg class="ic"><use href="{{ asset('icons.svg') }}#i-cart"/></svg><span class="icon-btn__label" data-cart-total>Корзина</span>
+          <span class="badge-count" data-cart-count hidden>0</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+  <div class="delivery-bar">
+    <div class="wrap"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-bolt"/></svg>
+      Доставка {{ hours.text }} · бесплатно от {{ free_from|rub }} · <a href="/info/delivery">подробнее</a></div>
+  </div>
+
+  <main id="main" class="wrap main">{% block content %}{% endblock %}</main>
+
+  <footer class="footer">
+    <div class="wrap footer__grid">
+      <div>
+        <div class="logo logo--footer"><span class="logo__mark"><svg><use href="{{ asset('icons.svg') }}#i-sprout"/></svg></span><span class="logo__text">{{ wordmark() }}</span></div>
+        <p class="muted">Свежие продукты — для вашей семьи</p>
+      </div>
+      <nav aria-label="Покупателям"><h3>Покупателям</h3>
+        <a href="/info/about">О нас</a><a href="/promo">Акции</a><a href="/info/delivery">Доставка</a><a href="/info/payment">Оплата</a><a href="/info/returns">Возврат и обмен</a><a href="/info/contacts">Контакты</a></nav>
+      <nav aria-label="Бизнесу"><h3>Бизнесу</h3>
+        <a href="/business">Оптовые цены</a><a href="/business#apply">Оставить заявку</a></nav>
+      <nav aria-label="Документы"><h3>Документы</h3>
+        <a href="/info/offer">Публичная оферта</a><a href="/info/privacy">Политика конфиденциальности</a></nav>
+      <div><h3>Мы на связи</h3><p class="muted"><a href="tel:{{ shop_phone|replace(" ", "")|replace("(", "")|replace(")", "")|replace("-", "") }}">{{ shop_phone }}</a><br>{{ hours.text|capitalize }}</p>{{ social_links(socials) }}</div>
+    </div>
+    <div class="wrap footer__bottom muted">© {{ year() }} {{ shop_name }}{% if socials.instagram %}<p class="footer__note">* Instagram — продукт компании Meta, признанной экстремистской организацией и запрещённой в России.</p>{% endif %}</div>
+  </footer>
+  <nav class="tabbar" aria-label="Разделы">
+    <a href="/" class="{{ 'is-active' if request.url.path == '/' }}"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-store"/></svg>Главная</a>
+    <a href="/catalog" class="{{ 'is-active' if request.url.path.startswith(('/catalog', '/search', '/product')) }}"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-grid"/></svg>Каталог</a>
+    <a href="/cart" class="tabbar__cart {{ 'is-active' if request.url.path in ('/cart', '/checkout') }}"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-cart"/></svg>Корзина<span class="badge-count" data-cart-count hidden>0</span></a>
+    <a href="/account" class="{{ 'is-active' if request.url.path in ('/account', '/login') }}" data-account-link><svg class="ic"><use href="{{ asset('icons.svg') }}#i-user"/></svg>Профиль</a>
+  </nav>
+  <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
+  <script type="module" src="{{ asset('js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

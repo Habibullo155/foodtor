@@ -1,0 +1,44 @@
+{% from "_macros.html" import icon %}
+  <aside class="filters" id="filters" data-filters>
+    <form method="get" action="{{ '/search' if filters.q else ('/catalog/' ~ filters.category.slug if filters.category else '/catalog') }}" data-filter-form>
+      {% if filters.q %}<input type="hidden" name="q" value="{{ filters.q }}">{% endif %}
+      <div class="filters__head"><h2>Фильтры</h2><button class="icon-btn filters__close" type="button" data-filters-close aria-label="Закрыть">{{ icon('x') }}</button></div>
+
+      <div class="filter" data-collapsible="filter-categories">
+        <div class="filter__title"><span>Категория</span>
+          <button class="link small" type="button" data-collapse-toggle aria-expanded="true"><span data-when-open>Скрыть</span><span data-when-closed>Все ({{ categories|length }})</span></button></div>
+        <a class="filter__cat {{ 'is-active' if not filters.category }}" href="/catalog">Все товары</a>
+        <div data-collapse-body>
+        {% for c, n in categories %}
+          <a class="filter__cat {{ 'is-active' if filters.category and filters.category.id == c.id }}" href="/catalog/{{ c.slug }}">{{ c.name }} <span class="muted">{{ n }}</span></a>
+        {% endfor %}
+        </div>
+      </div>
+
+      {% if page.price_range %}
+      <div class="filter"><div class="filter__title"><span>Цена, ₽</span></div>
+        <div class="filter__row">
+          <input class="input" type="number" name="price_min" min="0" step="1" inputmode="numeric" placeholder="от {{ page.price_range[0]|int }}" value="{{ filters.price_min|int if filters.price_min is not none else '' }}">
+          <input class="input" type="number" name="price_max" min="0" step="1" inputmode="numeric" placeholder="до {{ page.price_range[1]|int }}" value="{{ filters.price_max|int if filters.price_max is not none else '' }}">
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="filter"><label class="check"><input type="checkbox" name="in_stock" value="true" {{ 'checked' if filters.in_stock }}> Только в наличии</label></div>
+
+      {% if page.brands %}
+      <div class="filter"><div class="filter__title"><span>Бренд</span></div>
+        <div class="filter__list">
+        {% for b, n in page.brands %}
+          <label class="check"><input type="checkbox" name="brand" value="{{ b }}" {{ 'checked' if b in filters.brands }}> {{ b }} <span class="muted">{{ n }}</span></label>
+        {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      <input type="hidden" name="sort" value="{{ filters.sort }}">
+      <div class="filters__actions">
+        <button class="btn btn--primary" type="submit">Показать</button>
+        {% if filters.active %}<a class="btn btn--ghost" href="{{ '/search?q=' ~ filters.q|urlencode if filters.q else ('/catalog/' ~ filters.category.slug if filters.category else '/catalog') }}">Сбросить</a>{% endif %}
+      </div>
+    </form>
+  </aside>

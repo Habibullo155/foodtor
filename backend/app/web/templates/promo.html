@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_macros.html" import product_card, icon %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<span>Акции</span></nav>
+<div class="catalog__head"><h1>Акции <span class="muted">{{ items|length }}</span></h1></div>
+<p class="muted promo__lead">Товары со скидкой — самые выгодные первыми. Цена по акции действует, пока товар есть в наличии.</p>
+{% if items %}
+  <div class="grid">{% for p in items %}{{ product_card(p, eager=loop.index <= 4) }}{% endfor %}</div>
+{% else %}
+  <div class="empty">{{ icon('star', 'ic ic--xl') }}<h2>Сейчас акций нет</h2><p class="muted">Загляните позже — скидки обновляем каждую неделю</p><a class="btn btn--primary" href="/catalog">В каталог</a></div>
+{% endif %}
+{% endblock %}

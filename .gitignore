@@ -1,0 +1,49 @@
+# Секреты и локальные данные
+DEMO_ACCOUNTS.md
+.env
+*.env
+!*.env.example
+!server.env.example
+deploy/.env
+deploy/backups/
+deploy/web/
+backend/.server-data/
+backend/.demo-db/
+backend/media/
+
+# Python
+**/__pycache__/
+*.py[cod]
+backend/.venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Flutter / Dart
+frontend/build/
+frontend/.dart_tool/
+frontend/.flutter-plugins
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/.pub-cache/
+frontend/.pub/
+frontend/**/Generated.xcconfig
+frontend/**/ephemeral/
+frontend/**/Pods/
+frontend/**/.symlinks/
+frontend/android/.gradle/
+frontend/android/local.properties
+frontend/android/**/GeneratedPluginRegistrant.*
+frontend/ios/Flutter/flutter_export_environment.sh
+
+# Редакторы и система
+.idea/
+*.iml
+.vscode/
+.claude/
+.DS_Store
+*.log
+*.swp

@@ -1,0 +1,77 @@
+# Caddy сам получает и продлевает HTTPS-сертификаты Let's Encrypt для обоих доменов.
+# Магазин: HTML-страницы собирает бэкенд (FastAPI + шаблоны) — Caddy проксирует всё, кроме фото из /media.
+# Админка: Flutter-сборка (статика), /api проксируется на тот же бэкенд → CORS не нужен.
+
+(security) {
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+		-Server
+	}
+}
+
+(api) {
+	# Больше 12 МБ не принимаем (фото — до 10 МБ, импорт каталога — до 10 МБ): защита от забивания памяти
+	request_body {
+		max_size 12MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	handle /health {
+		reverse_proxy api:8000
+	}
+	# Загруженные фото (аватары, товары) — пережаты в WebP сервером. Только картинки, никакого исполнения
+	handle /media/* {
+		root * /srv
+		header Cache-Control "public, max-age=2592000, immutable"
+		header Content-Security-Policy "default-src 'none'; img-src 'self'; sandbox"
+		file_server
+	}
+}
+
+{$SHOP_DOMAIN} {
+	import security
+	encode zstd gzip
+	import api
+	# Всё остальное — страницы и /static витрины. CSP, Referrer-Policy и кэш задаёт само приложение
+	handle {
+		reverse_proxy api:8000 {
+			header_up X-Real-IP {remote_host}
+		}
+	}
+	log {
+		output stdout
+		format console
+	}
+}
+
+www.{$SHOP_DOMAIN} {
+	redir https://{$SHOP_DOMAIN}{uri} permanent  # один адрес сайта для поисковиков
+}
+
+{$ADMIN_DOMAIN} {
+	import security
+	encode zstd gzip
+	header {
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Flutter web: wasm (CanvasKit) + шрифт Inter с Google Fonts. Плитки карты OSM — картинки по https
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		X-Robots-Tag "noindex, nofollow"
+	}
+	root * /srv/admin
+	import api
+	# Статика Flutter: index/bootstrap не кэшируем (новый релиз виден сразу), ассеты — на неделю
+	handle {
+		@nocache path / /index.html /flutter_bootstrap.js /flutter_service_worker.js /main.dart.js /version.json
+		header @nocache Cache-Control "no-cache"
+		@assets path /assets/* /canvaskit/* /icons/*
+		header @assets Cache-Control "public, max-age=604800"
+		try_files {path} /index.html
+		file_server
+	}
+}

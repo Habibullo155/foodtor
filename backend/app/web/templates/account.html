@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block head %}<link rel="stylesheet" href="{{ asset('vendor/leaflet/leaflet.css') }}">{% endblock %}
+{% block content %}
+<div class="account" data-account>
+  <aside class="account__nav panel">
+    <div class="me" data-me></div>
+    <nav>
+      <a href="#orders" data-section-link="orders">Мои заказы</a>
+      <a href="#purchases" data-section-link="purchases">История покупок</a>
+      <a href="#addresses" data-section-link="addresses">Мои адреса</a>
+      <a href="#profile" data-section-link="profile">Профиль</a>
+      <a href="#settings" data-section-link="settings">Настройки</a>
+      <button class="link link--danger" type="button" data-logout>Выйти</button>
+    </nav>
+  </aside>
+  <section class="account__main" data-section><div class="skeleton"></div></section>
+</div>
+{% include "_map_dialog.html" %}
+{% endblock %}
+{% block scripts %}<script src="{{ asset('vendor/leaflet/leaflet.js') }}"></script><script type="module" src="{{ asset('js/account-page.js') }}"></script>{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<div class="auth panel" data-auth>
+  <h1>Вход и регистрация</h1>
+  <p class="muted">Заказы, адреса и история покупок — в одном месте</p>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" class="is-active" data-tab="sms">{{ icon('phone') }} По телефону</button>
+    <button type="button" role="tab" data-tab="email">{{ icon('mail') }} По email</button>
+  </div>
+  <div data-pane="code">
+    <form data-step="target" novalidate>
+      <label class="field"><span data-target-label>Номер телефона</span><input class="input input--lg" name="target" required autocomplete="tel" inputmode="tel" placeholder="+7 9XX XXX-XX-XX"></label>
+      <p class="small muted" data-target-hint>Пришлём SMS с кодом. Если номера ещё нет у нас — создадим аккаунт.</p>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">Получить код</button>
+    </form>
+    <form data-step="code" hidden novalidate>
+      <p data-sent-to></p>
+      <p class="dev-code" data-dev-code hidden></p>
+      <label class="field"><span data-code-label>Код из SMS</span><input class="input input--code" name="code" required inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="\d{6}"></label>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">Войти</button>
+      <div class="row row--between"><button class="link" type="button" data-change>Изменить</button><button class="link" type="button" data-resend disabled>Отправить ещё раз</button></div>
+    </form>
+    <form data-step="name" hidden novalidate>
+      <p data-confirmed></p>
+      <label class="field"><span>Как к вам обращаться?</span><input class="input input--lg" name="name" required minlength="2" maxlength="200" autocomplete="name"></label>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">Готово</button>
+    </form>
+    <button class="link center-block" type="button" data-to-password hidden>Войти по паролю</button>
+  </div>
+  <div data-pane="password" hidden>
+    <form data-password-form novalidate>
+      <label class="field"><span>Email</span><input class="input" name="email" type="email" required autocomplete="username"></label>
+      <label class="field"><span>Пароль</span><input class="input" name="password" type="password" required autocomplete="current-password"></label>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">Войти</button>
+    </form>
+    <button class="link center-block" type="button" data-to-code>Войти по коду из письма</button>
+  </div>
+  <p class="error" data-error hidden></p>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ asset('js/login-page.js') }}"></script>{% endblock %}

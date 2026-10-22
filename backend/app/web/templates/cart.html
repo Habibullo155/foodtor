@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<h1>Корзина</h1>
+<div class="cart" data-cart-page>
+  <div class="cart__lines" data-cart-lines><div class="skeleton"></div></div>
+  <aside class="cart__summary panel" data-cart-summary hidden>
+    <h2>Доставка</h2>
+    <div class="seg" role="radiogroup" data-delivery>
+      <label><input type="radio" name="delivery" value="courier" checked><span>{{ icon('truck') }} Курьер</span></label>
+      <label><input type="radio" name="delivery" value="express"><span>{{ icon('bolt') }} За 2 часа</span></label>
+      <label><input type="radio" name="delivery" value="pickup"><span>{{ icon('store') }} Самовывоз</span></label>
+    </div>
+    <div class="progress" data-free-progress><div class="progress__bar"></div><p class="small muted" data-free-text></p></div>
+    <form class="promo" data-promo><input class="input" name="code" placeholder="Промокод" maxlength="32" autocomplete="off"><button class="btn btn--ghost" type="submit">Применить</button></form>
+    <p class="small" data-promo-msg></p>
+    <dl class="totals" data-totals></dl>
+    <p class="small error" data-min-order hidden></p>
+    <a class="btn btn--primary btn--lg btn--block" href="/checkout" data-checkout-btn>Оформить заказ</a>
+  </aside>
+</div>
+<section class="section" data-recs hidden><div class="section__head"><h2>С этим часто покупают</h2></div><div class="rail" data-recs-list></div></section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ asset('js/cart-page.js') }}"></script>{% endblock %}

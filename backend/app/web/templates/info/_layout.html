@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<span>{{ heading }}</span></nav>
+<article class="prose">
+  <h1>{{ heading }}</h1>
+  {% block body %}{% endblock %}
+</article>
+{% endblock %}

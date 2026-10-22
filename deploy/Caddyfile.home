@@ -1,0 +1,35 @@
+# Сервер на своём компьютере (scripts/server.sh): Caddy слушает только localhost,
+# снаружи к нему приходит SSH-туннель. HTTPS делает сервис туннеля, поэтому здесь — обычный http.
+{
+	admin off
+	auto_https off
+	servers {
+		# заголовки X-Forwarded-* от туннеля (ssh на этом же компьютере) — настоящие, оставляем их
+		trusted_proxies static private_ranges
+	}
+}
+
+# любой Host: запросы приходят с адресом туннеля
+http://:{$CADDY_PORT:8080} {
+	bind 127.0.0.1
+	encode zstd gzip
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+		-Server
+	}
+	request_body {
+		max_size 12MB
+	}
+	handle /media/* {
+		root * {$MEDIA_ROOT}
+		uri strip_prefix /media
+		header Cache-Control "public, max-age=2592000, immutable"
+		header Content-Security-Policy "default-src 'none'; img-src 'self'; sandbox"
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:{$API_PORT:8000}
+	}
+}

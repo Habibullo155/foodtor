@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from "_macros.html" import product_card, rail, icon, stars %}
+{% block head %}
+{% if images %}<link rel="preload" as="image" href="{{ images[0] }}" fetchpriority="high">{% endif %}
+<meta property="product:price:amount" content="{{ p.price.price }}">
+<meta property="product:price:currency" content="RUB">
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": p.name,
+  "image": abs_images,
+  "description": description,
+  "sku": p.sku,
+  "brand": {"@type": "Brand", "name": p.brand or shop_name},
+  "offers": {"@type": "Offer", "priceCurrency": "RUB", "price": p.price.price|string,
+             "availability": "https://schema.org/InStock" if p.in_stock else "https://schema.org/OutOfStock",
+             "url": canonical},
+  "aggregateRating": ({"@type": "AggregateRating", "ratingValue": p.rating, "reviewCount": p.reviews_count} if p.rating else none)
+}|tojson }}</script>
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Каталог", "item": base_url ~ "catalog"},
+    {"@type": "ListItem", "position": 2, "name": product.category.name if product.category else "Товары",
+     "item": base_url ~ ("catalog/" ~ product.category.slug if product.category else "catalog")},
+    {"@type": "ListItem", "position": 3, "name": p.name}
+  ]}|tojson }}</script>
+{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<a href="/catalog">Каталог</a>
+  {% if product.category %}{{ icon('chevron') }}<a href="/catalog/{{ product.category.slug }}">{{ product.category.name }}</a>{% endif %}</nav>
+
+<div class="pdp" data-product='{{ {"id": p.id, "name": p.name, "price": p.price.price|float, "image": p.image_url, "unit": p.unit, "url": product_url(p), "stock": p.stock_left if p.stock_left is not none else 999, "in_stock": p.in_stock}|tojson }}'>
+  <div class="pdp__gallery">
+    <div class="pdp__image">
+      {% if images %}<img src="{{ images[0] }}" alt="{{ p.name }}{% if p.unit %}, {{ p.unit }}{% endif %}" width="560" height="560" fetchpriority="high" data-main-image>{% endif %}
+      <span class="card__badges">
+        {% if 'hit' in p.badges %}<span class="tag tag--hit">Хит</span>{% endif %}
+        {% if 'fresh' in p.badges %}<span class="tag tag--fresh">Новинка</span>{% endif %}
+      </span>
+    </div>
+    {% if images|length > 1 %}
+    <div class="pdp__thumbs">{% for img in images %}<button type="button" data-thumb="{{ img }}" aria-label="Фото {{ loop.index }}"><img src="{{ img }}" alt="{{ p.name }}, фото {{ loop.index }}" width="64" height="64" loading="lazy"></button>{% endfor %}</div>
+    {% endif %}
+  </div>
+
+  <div class="pdp__info">
+    <h1>{{ p.name }}</h1>
+    <div class="pdp__meta muted">{% if p.brand %}{{ p.brand }}{% endif %}{% if p.unit %} · {{ p.unit }}{% endif %}{% if product.attributes.get('Страна') %} · {{ product.attributes['Страна'] }}{% endif %}</div>
+    {% if p.rating %}<a href="#reviews" class="pdp__rating">{{ stars(p.rating, p.reviews_count) }}</a>{% endif %}
+
+    <div class="pdp__buybox">
+      <div class="price price--lg">
+        <span class="price__now">{{ p.price.price|rub }}</span>
+        {% if p.price.compare_at_price and p.price.compare_at_price > p.price.price %}
+          <s class="price__old">{{ p.price.compare_at_price|rub }}</s>
+          <span class="tag tag--sale">−{{ ((1 - p.price.price / p.price.compare_at_price) * 100)|round|int }}%</span>
+        {% endif %}
+      </div>
+      {% if p.price.tiers %}<ul class="tiers">{% for t in p.price.tiers %}<li>от {{ t.min_quantity }} шт — {{ t.unit_price|rub }}</li>{% endfor %}</ul>{% endif %}
+      {% if p.in_stock %}
+        {% if p.stock_left %}<p class="warn small">Осталось {{ p.stock_left }} шт.</p>{% endif %}
+        <div class="qty-slot qty-slot--lg" data-qty-slot>
+          <button class="btn btn--primary btn--lg btn--block" type="button" data-add>{{ icon('cart') }}<span>Добавить в корзину</span></button>
+        </div>
+      {% else %}
+        <p class="warn">Сейчас нет в наличии</p>
+      {% endif %}
+      <ul class="pdp__delivery">
+        <li>{{ icon('bolt') }} Экспресс за 2 часа — {{ express_fee|rub }}</li>
+        <li>{{ icon('truck') }} Курьер — {{ courier_fee|rub }}, бесплатно от {{ free_from|rub }}</li>
+        <li>{{ icon('store') }} Самовывоз — бесплатно</li>
+      </ul>
+    </div>
+
+    {% if product.description %}<div class="pdp__desc"><h2>Описание</h2><p>{{ product.description }}</p></div>{% endif %}
+    {% if product.attributes %}
+    <dl class="specs">{% for k, v in product.attributes.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl>
+    {% endif %}
+  </div>
+</div>
+
+{{ rail('С этим часто покупают', cross) }}
+{{ rail('Похожие товары', similar) }}
+
+<section class="section" id="reviews">
+  <div class="section__head"><h2>Отзывы {% if reviews %}<span class="muted">{{ reviews|length }}</span>{% endif %}</h2></div>
+  {% if reviews %}
+    <div class="reviews">
+    {% for r in reviews %}
+      <article class="review">
+        <div class="review__head"><b>{{ r.author }}</b>
+          <span class="review__stars" aria-label="Оценка {{ r.rating }} из 5">{% for i in range(5) %}{{ icon('star', 'ic ic--star' ~ (' is-off' if i >= r.rating else '')) }}{% endfor %}</span>
+          <span class="muted small">{{ r.created_at.strftime('%d.%m.%Y') }}</span></div>
+        <p>{{ r.text }}</p>
+      </article>
+    {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted">Отзывов пока нет. Купите товар — и сможете оставить первый.</p>
+  {% endif %}
+</section>
+{% endblock %}

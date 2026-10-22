@@ -1,0 +1,9 @@
+{% extends "info/_layout.html" %}
+{% block body %}
+<p>Телефон: <a href="tel:{{ shop_phone|replace(' ', '')|replace('(', '')|replace(')', '')|replace('-', '') }}">{{ shop_phone }}</a> ({{ hours.text }})</p>
+<p>Почта: <a href="mailto:{{ shop_email }}">{{ shop_email }}</a></p>
+{% if socials.telegram %}<p>Telegram: <a href="{{ socials.telegram }}" target="_blank" rel="noopener">{{ socials.telegram|replace('https://', '') }}</a></p>{% endif %}
+{% if socials.instagram %}<p>Instagram*: <a href="{{ socials.instagram }}" target="_blank" rel="noopener">{{ socials.instagram|replace('https://', '') }}</a></p>
+<p class="muted">* Instagram — продукт компании Meta, признанной экстремистской организацией и запрещённой в России.</p>{% endif %}
+<p>По вопросам заказа удобнее всего писать в чат заказа в <a href="/account">личном кабинете</a>.</p>
+{% endblock %}

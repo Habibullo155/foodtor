@@ -1,0 +1,11 @@
+# В образ — только код. Локальные данные и секреты не должны туда попасть
+.demo-db/
+.venv/
+media/
+tests/
+.env
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+.server-data/

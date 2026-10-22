@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% from "_macros.html" import product_card, icon %}
+{% macro qs(page_no) -%}
+?{% if filters.q %}q={{ filters.q|urlencode }}&{% endif %}{% for b in filters.brands %}brand={{ b|urlencode }}&{% endfor %}{% if filters.price_min is not none %}price_min={{ filters.price_min }}&{% endif %}{% if filters.price_max is not none %}price_max={{ filters.price_max }}&{% endif %}{% if filters.in_stock %}in_stock=true&{% endif %}sort={{ filters.sort }}&page={{ page_no }}
+{%- endmacro %}
+{% block head %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "BreadcrumbList",
+  "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Каталог", "item": base_url ~ "catalog"}]
+    + ([{"@type": "ListItem", "position": 2, "name": filters.category.name, "item": canonical}] if filters.category else [])
+}|tojson }}</script>
+{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<a href="/catalog">Каталог</a>{% if filters.category %}{{ icon('chevron') }}<span>{{ filters.category.name }}</span>{% endif %}</nav>
+<div class="catalog">
+  {% include "_filters.html" %}
+
+  <section class="catalog__main">
+    <div class="catalog__head">
+      <h1>{{ heading }} <span class="muted">{{ page.total }}</span></h1>
+      <div class="catalog__tools">
+        <button class="btn btn--ghost filters-open" type="button" data-filters-open>{{ icon('filter') }}Фильтры{% if filters.active %} · {{ filters.active }}{% endif %}</button>
+        <label class="select"><span class="sr-only">Сортировка</span>
+          <select data-sort>
+            {% for v, label in [('popular', 'Сначала популярные'), ('price_asc', 'Сначала дешевле'), ('price_desc', 'Сначала дороже'), ('new', 'Новинки')] %}
+            <option value="{{ v }}" {{ 'selected' if filters.sort == v }}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+    </div>
+    {% if page.items %}
+      <div class="grid">{% for p in page.items %}{{ product_card(p, eager=loop.index <= 4) }}{% endfor %}</div>
+      {% if page.pages > 1 %}
+      <nav class="pager" aria-label="Страницы">
+        {% if page.page > 1 %}<a class="btn btn--ghost" rel="prev" href="{{ qs(page.page - 1) }}">← Назад</a>{% endif %}
+        <span class="muted">Страница {{ page.page }} из {{ page.pages }}</span>
+        {% if page.page < page.pages %}<a class="btn btn--ghost" rel="next" href="{{ qs(page.page + 1) }}">Дальше →</a>{% endif %}
+      </nav>
+      {% endif %}
+    {% else %}
+      <div class="empty">{{ icon('search', 'ic ic--xl') }}<h2>Ничего не нашли</h2><p class="muted">Попробуйте другой запрос или сбросьте фильтры</p><a class="btn btn--primary" href="/catalog">Весь каталог</a></div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% from "_macros.html" import product_card, rail, icon %}
+{% block head %}
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "GroceryStore", "name": shop_name, "url": base_url,
+  "telephone": shop_phone, "email": shop_email, "priceRange": "₽", "openingHours": hours.schema, "sameAs": socials.links,
+  "image": base_url ~ "static/favicon.svg"
+}|tojson }}</script>
+<script type="application/ld+json">{{ {
+  "@context": "https://schema.org", "@type": "WebSite", "name": shop_name, "url": base_url,
+  "potentialAction": {"@type": "SearchAction", "target": base_url ~ "search?q={query}",
+                      "query-input": "required name=query"}
+}|tojson }}</script>
+{% endblock %}
+{% block content %}
+{% if stories %}
+<section class="stories" aria-label="Истории">
+  {% for st in stories %}
+  <button class="story" type="button" data-story="{{ loop.index0 }}" data-story-id="{{ st.id }}-{{ st.updated_at.timestamp()|int }}">
+    <span class="story__ring" data-color="{{ st.color_hex }}"><img src="{{ st.cover_url }}" alt="" width="64" height="64" loading="lazy"></span>
+    <span class="story__title">{{ st.title }}</span>
+  </button>
+  {% endfor %}
+</section>
+<script type="application/json" data-stories>{{ stories_json(stories)|tojson }}</script>
+<dialog class="story-viewer" data-story-viewer aria-label="История">
+  <div class="story-viewer__bars" data-bars></div>
+  <button class="icon-btn story-viewer__close" type="button" data-close aria-label="Закрыть">{{ icon('x') }}</button>
+  <div class="story-viewer__slide" data-slide></div>
+  <button class="story-viewer__nav story-viewer__nav--prev" type="button" data-prev aria-label="Назад"></button>
+  <button class="story-viewer__nav story-viewer__nav--next" type="button" data-next aria-label="Дальше"></button>
+</dialog>
+{% endif %}
+<section class="hero">
+  <div class="hero__text">
+    <div class="hero__brand">{{ icon('sprout') }} {{ shop_name }}</div>
+    <h1>Свежие продукты — для вашей семьи</h1>
+    <p>Овощи, фрукты, бакалея и всё к столу. Отбираем каждое утро, привозим за 2 часа. Бесплатная доставка от {{ free_from|rub }}.</p>
+    <a class="btn btn--primary btn--lg" href="/catalog">Перейти в каталог</a>
+  </div>
+  <div class="hero__art" aria-hidden="true">
+    <div class="hero__produce">
+      <img class="p1" src="/static/demo/lettuce.webp" alt="" width="256" height="256">
+      <img class="p4" src="/static/demo/broccoli.webp" alt="" width="256" height="256">
+      <img class="p3" src="/static/demo/red_pepper.webp" alt="" width="256" height="256">
+      <img class="p2" src="/static/demo/tomato.webp" alt="" width="256" height="256">
+    </div>
+    <div class="hero__bag"><span class="hero__bag-logo">{{ icon('sprout') }}<span><span class="logo__food">FOOD</span><span class="logo__tor">TOR</span></span></span></div>
+  </div>
+</section>
+<ul class="benefits benefits-wrap">
+  <li>{{ icon('fast') }}<span>Быстрая доставка<br>свежих продуктов</span></li>
+  <li>{{ icon('shield') }}<span>Качество<br>и забота о вас</span></li>
+</ul>
+
+<section class="section" data-collapsible="categories">
+  <div class="section__head">
+    <h2>Категории</h2>
+    <button class="link" type="button" data-collapse-toggle aria-expanded="true">
+      <span data-when-open>Скрыть</span><span data-when-closed>Показать ({{ categories|length }})</span>
+    </button>
+  </div>
+  <div class="cats" data-collapse-body>
+    {% for c, n in categories %}
+    <a class="cat" href="/catalog/{{ c.slug }}">
+      <span class="cat__img">{% if c.image_url %}<img src="{{ c.image_url }}" alt="{{ c.name }}" width="96" height="96" loading="lazy">{% endif %}</span>
+      <span class="cat__name">{{ icon('sprout') }}{{ c.name }}</span><span class="cat__count muted">{{ n }} {{ plural(n, 'товар', 'товара', 'товаров') }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+{{ rail('Хиты недели', hits, '/catalog?sort=popular') }}
+{{ rail('Скидки', sale, '/promo') }}
+
+<section class="section catalog" id="catalog">
+  {% include "_filters.html" %}
+  <div class="catalog__main">
+    <div class="catalog__head">
+      <h2>Весь каталог <span class="muted">{{ page.total }}</span></h2>
+      <div class="catalog__tools">
+        <button class="btn btn--ghost filters-open" type="button" data-filters-open>{{ icon('filter') }}Фильтры</button>
+        <label class="select"><span class="sr-only">Сортировка</span>
+          <select data-sort data-sort-target="/catalog">
+            {% for v, label in [('popular', 'Сначала популярные'), ('price_asc', 'Сначала дешевле'), ('price_desc', 'Сначала дороже'), ('new', 'Новинки')] %}
+            <option value="{{ v }}" {{ 'selected' if v == 'popular' }}>{{ label }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+    </div>
+    <div class="grid">{% for p in page.items %}{{ product_card(p, eager=loop.index <= 4) }}{% endfor %}</div>
+    {% if page.pages > 1 %}<div class="center"><a class="btn btn--ghost btn--lg" href="/catalog?page=2">Показать ещё</a></div>{% endif %}
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}{% if stories %}<script type="module" src="{{ asset('js/stories.js') }}"></script>{% endif %}{% endblock %}

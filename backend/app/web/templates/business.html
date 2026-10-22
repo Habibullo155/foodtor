@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<span>Для бизнеса</span></nav>
+<section class="biz-hero">
+  <h1>Продукты для бизнеса по оптовым ценам</h1>
+  <p>Для кафе, ресторанов, магазинов, столовых и офисов. Подключим ваш прайс — оптовые цены будут в корзине и при каждом заказе.</p>
+  <a class="btn btn--primary btn--lg" href="#apply">Оставить заявку</a>
+</section>
+
+<ul class="biz-cards">
+  <li>{{ icon('store') }}<b>Оптовые цены</b><span>Персональный прайс для вашей компании и скидки на целые категории.</span></li>
+  <li>{{ icon('grid') }}<b>Дешевле от объёма</b><span>Чем больше берёте — тем ниже цена за штуку или килограмм.</span></li>
+  <li>{{ icon('truck') }}<b>Доставка {{ hours.days_text }}</b><span>{{ hours.time_text|capitalize }}, бесплатно при заказе от {{ free_from|rub }}.</span></li>
+  <li>{{ icon('shield') }}<b>Оплата при получении</b><span>Наличными или картой — без предоплаты.</span></li>
+</ul>
+
+<section class="section">
+  <div class="section__head"><h2>Как подключиться</h2></div>
+  <ol class="biz-steps">
+    <li><b>Войдите</b> на сайт по номеру телефона.</li>
+    <li><b>Отправьте заявку</b> — название компании и ИНН.</li>
+    <li><b>Мы проверим</b> компанию и подключим ваш прайс.</li>
+    <li><b>Заказывайте</b> — оптовые цены применяются в корзине автоматически.</li>
+  </ol>
+</section>
+
+<section class="panel biz-apply" id="apply" data-b2b>
+  <h2>Заявка на оптовые цены</h2>
+  <div data-b2b-state><div class="spinner"></div></div>
+  <form data-b2b-form hidden novalidate>
+    <label class="field"><span>Название компании или ИП</span><input class="input" name="legal_name" required minlength="2" maxlength="255" autocomplete="organization" placeholder="ООО «Ромашка»"></label>
+    <label class="field"><span>ИНН</span><input class="input" name="tax_id" required inputmode="numeric" maxlength="12" placeholder="10 или 12 цифр"></label>
+    <p class="error" data-error hidden></p>
+    <button class="btn btn--primary btn--lg" type="submit">Отправить заявку</button>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ asset('js/business-page.js') }}"></script>{% endblock %}

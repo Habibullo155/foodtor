@@ -1,0 +1,12 @@
+{% from "_macros.html" import icon %}
+<dialog class="map-dialog" data-map-dialog>
+  <div class="map-dialog__head"><h2>Куда доставить</h2><button class="icon-btn" type="button" data-map-close aria-label="Закрыть">{{ icon('x') }}</button></div>
+  <div class="map-dialog__map"><div data-map></div><span class="map-pin" aria-hidden="true">{{ icon('pin') }}</span>
+    <button class="btn btn--light map-locate" type="button" data-map-locate>{{ icon('locate') }} Моё местоположение</button></div>
+  <div class="map-dialog__foot">
+    <p class="map-addr" data-map-address>Передвиньте карту — точка доставки под булавкой</p>
+    <p class="small" data-map-verdict></p>
+    <p class="small warn" data-map-geo hidden></p>
+    <button class="btn btn--primary btn--lg btn--block" type="button" data-map-ok disabled>Доставить сюда</button>
+  </div>
+</dialog>

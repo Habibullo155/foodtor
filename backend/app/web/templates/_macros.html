@@ -1,0 +1,44 @@
+{% macro icon(name, cls='ic') %}<svg class="{{ cls }}" aria-hidden="true"><use href="{{ asset('icons.svg') }}#i-{{ name }}"/></svg>{% endmacro %}
+
+{% macro stars(rating, count=None) %}
+<span class="stars" title="Оценка {{ rating }} из 5">{{ icon('star', 'ic ic--star') }}<b>{{ '%.1f'|format(rating) }}</b>{% if count %}<span class="muted"> · {{ count }} {{ plural(count, 'отзыв', 'отзыва', 'отзывов') }}</span>{% endif %}</span>
+{% endmacro %}
+
+{% macro product_card(p, eager=False) %}
+<article class="card" data-product='{{ {"id": p.id, "name": p.name, "price": p.price.price|float, "image": p.image_url, "unit": p.unit, "url": product_url(p), "stock": p.stock_left if p.stock_left is not none else 999, "in_stock": p.in_stock}|tojson }}'>
+  <a class="card__media" href="{{ product_url(p) }}" tabindex="-1" aria-hidden="true">
+    {% if p.image_url %}<img src="{{ p.image_url }}" alt="{{ p.name }}{% if p.unit %}, {{ p.unit }}{% endif %}" width="256" height="256" {% if not eager %}loading="lazy"{% else %}fetchpriority="high"{% endif %} decoding="async">{% endif %}
+    <span class="card__badges">
+      {% if 'hit' in p.badges %}<span class="tag tag--hit">Хит</span>{% endif %}
+      {% if 'fresh' in p.badges %}<span class="tag tag--fresh">Новинка</span>{% endif %}
+      {% if p.price.compare_at_price and p.price.compare_at_price > p.price.price %}<span class="tag tag--sale">−{{ ((1 - p.price.price / p.price.compare_at_price) * 100)|round|int }}%</span>{% endif %}
+      {% if 'lowStock' in p.badges %}<span class="tag tag--low">Осталось {{ p.stock_left }}</span>{% endif %}
+    </span>
+  </a>
+  <div class="card__body">
+    <div class="card__meta muted">{{ p.brand or '' }}{% if p.unit %} · {{ p.unit }}{% endif %}</div>
+    <h3 class="card__title"><a href="{{ product_url(p) }}">{{ p.name }}</a></h3>
+    {% if p.rating %}{{ stars(p.rating, p.reviews_count) }}{% endif %}
+    <div class="card__buy">
+      <div class="price">
+        <span class="price__now">{{ p.price.price|rub }}</span>
+        {% if p.price.compare_at_price and p.price.compare_at_price > p.price.price %}<s class="price__old">{{ p.price.compare_at_price|rub }}</s>{% endif %}
+      </div>
+      {% if p.in_stock %}
+      <div class="qty-slot" data-qty-slot>
+        <button class="btn btn--primary btn--sm" type="button" data-add>{{ icon('plus') }}<span>В корзину</span></button>
+      </div>
+      {% else %}<span class="muted small">Нет в наличии</span>{% endif %}
+    </div>
+  </div>
+</article>
+{% endmacro %}
+
+{% macro rail(title, items, link=None) %}
+{% if items %}
+<section class="section">
+  <div class="section__head"><h2>{{ title }}</h2>{% if link %}<a class="link" href="{{ link }}">Все {{ icon('chevron') }}</a>{% endif %}</div>
+  <div class="rail">{% for p in items %}{{ product_card(p) }}{% endfor %}</div>
+</section>
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,84 @@
+# Продакшен на одном VPS: docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
+name: saasshop
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: shop
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 5s
+      retries: 20
+    # Наружу не публикуем — БД доступна только внутри docker-сети
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # только счётчики rate limit
+
+  api:
+    build: ../backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      APP_ENV: prod
+      DATABASE_URL: postgresql+asyncpg://shop:${POSTGRES_PASSWORD}@db:5432/shop
+      REDIS_URL: redis://redis:6379/0
+      PUBLIC_SHOP_URL: https://${SHOP_DOMAIN}
+      PUBLIC_API_URL: https://${SHOP_DOMAIN}
+      EXTRA_HOSTS: '["${ADMIN_DOMAIN}"]'  # админка тоже ходит в API (защита от подмены Host пропускает только свои домены)
+      MEDIA_ROOT: /app/media
+    volumes: [media:/app/media]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 15s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      SHOP_DOMAIN: ${SHOP_DOMAIN:?set SHOP_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set ADMIN_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./web/admin:/srv/admin:ro
+      - media:/srv/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: {condition: service_healthy}
+
+  # Ежедневный дамп БД, хранится 14 дней. Копируйте ./backups за пределы сервера (S3, другой VPS).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [./backups:/backups]
+    depends_on:
+      db: {condition: service_healthy}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          f=/backups/shop-$$(date +%F-%H%M).sql.gz
+          pg_dump -h db -U shop -d shop --no-owner | gzip > "$$f.tmp" && mv "$$f.tmp" "$$f" && echo "backup ok: $$f"
+          find /backups -name 'shop-*.sql.gz' -mtime +14 -delete
+          sleep 86400
+        done
+
+volumes:
+  pgdata:
+  media:
+  caddy_data:
+  caddy_config:
