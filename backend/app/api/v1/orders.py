@@ -115,7 +115,7 @@ async def quote(
     qty: dict[int, int] = {}
     for line in body.items:
         qty[line.product_id] = qty.get(line.product_id, 0) + line.quantity
-    products = (await session.scalars(select(Product).where(Product.id.in_(qty), Product.is_active))).unique().all()
+    products = (await session.scalars(select(Product).where(Product.id.in_(qty), Product.listed))).unique().all()
     if not products:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "No available products")
     q = await cart.quote(user, [LineRequest(p, qty[p.id]) for p in products])

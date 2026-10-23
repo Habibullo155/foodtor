@@ -13,6 +13,8 @@ from sqlalchemy import (
     UniqueConstraint,
     and_,
     func,
+    or_,
+    select,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -30,6 +32,18 @@ class Category(Base):
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     image_url: Mapped[str | None] = mapped_column(String(1024))
     position: Mapped[int] = mapped_column(Integer, default=0)  # порядок в карусели
+    # скрытая категория не видна на сайте вместе со всеми своими товарами — ассортимент готовят заранее
+    is_visible: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+
+
+class Brand(Base):
+    """Справочник фирм-производителей: у товара бренд хранится строкой, здесь — список для выбора в админке."""
+
+    __tablename__ = "brands"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120), unique=True)
+    logo_url: Mapped[str | None] = mapped_column(String(1024))
 
 
 class RelationKind(str, enum.Enum):
@@ -112,6 +126,17 @@ class Product(TimestampMixin, Base):
 
     cross_sell_products: Mapped[list["Product"]] = _related_products(RelationKind.CROSS_SELL)
     upsell_products: Mapped[list["Product"]] = _related_products(RelationKind.UPSELL)
+
+    @hybrid_property
+    def listed(self) -> bool:
+        """Виден покупателям: в продаже и категория не скрыта."""
+        return self.is_active and (self.category is None or self.category.is_visible)
+
+    @listed.inplace.expression
+    @classmethod
+    def _listed_expr(cls):
+        hidden = select(Category.id).where(Category.is_visible.is_(False))
+        return and_(cls.is_active, or_(cls.category_id.is_(None), cls.category_id.not_in(hidden)))
 
     @hybrid_property
     def unit_margin(self) -> Decimal:

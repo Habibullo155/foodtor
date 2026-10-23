@@ -163,6 +163,65 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('select products: hide, delete; brands and hidden categories', (
+    tester,
+  ) async {
+    final c = await pumpAdmin(tester, const Size(1440, 1400));
+    await login(tester, c, 'owner@saasshop.local');
+    await tester.tap(find.text('Товары').first);
+    await settle(tester);
+
+    final first = c.read(adminProductsProvider).take(3).map((p) => p.id);
+    final boxes = find.byType(Checkbox);
+    await tester.tap(boxes.at(1));
+    await tester.tap(boxes.at(2));
+    await tester.tap(boxes.at(3));
+    await tester.pump();
+    expect(find.text('Выбрано: 3'), findsOneWidget);
+    await tester.tap(find.text('Снять с продажи'));
+    await settle(tester);
+    final hidden = c
+        .read(adminProductsProvider)
+        .where((p) => first.contains(p.id));
+    expect(hidden.every((p) => !p.isActive), isTrue);
+
+    final before = c.read(adminProductsProvider).length;
+    await tester.tap(boxes.at(1));
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Удалить'));
+    await settle(tester);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, 'Удалить'),
+      ),
+    );
+    await settle(tester);
+    expect(c.read(adminProductsProvider).length, before - 1);
+
+    await tester.tap(find.text('Категории'));
+    await settle(tester);
+    expect(find.textContaining('скрыта от покупателей'), findsWidgets);
+    await tester.tap(find.text('Готово'));
+    await settle(tester);
+
+    await tester.tap(find.text('Фирмы'));
+    await settle(tester);
+    await tester.tap(find.text('Новая фирма'));
+    await settle(tester);
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Название'),
+      'Ферма Петрова',
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Сохранить'));
+    await settle(tester);
+    expect(
+      c.read(brandsProvider).map((b) => b.name),
+      contains('Ферма Петрова'),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   for (final (name, page) in [
     ('marketing', const MarketingPage()),
     ('support', const SupportPage()),

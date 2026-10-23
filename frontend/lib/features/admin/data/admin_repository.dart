@@ -31,6 +31,15 @@ abstract interface class AdminRepository {
   Future<AdminCategory> updateCategory(AdminCategory category);
   Future<String> importProducts(String filename, List<int> bytes);
 
+  /// Действие над выделенными товарами; возвращает, сколько товаров затронуто.
+  Future<int> bulkProducts(List<int> ids, BulkAction action, {int? categoryId});
+
+  Future<List<AdminBrand>> brands();
+  Future<AdminBrand> saveBrand(AdminBrand brand);
+
+  /// Фирма уходит из списка и у всех её товаров.
+  Future<void> deleteBrand(int id);
+
   /// Все товары в Excel: цены, остатки, ссылки на фото — поправить и загрузить обратно.
   Future<List<int>> exportProducts();
 
@@ -200,13 +209,10 @@ class ApiAdminRepository implements AdminRepository {
   @override
   Future<List<AdminCategory>> categories() => _wrap(
     () async => [
-      for (final c in _list(await _dio.get<dynamic>('/api/v1/categories')))
-        AdminCategory(
-          c['id'] as int,
-          c['name'] as String,
-          c['slug'] as String?,
-          c['image_url'] as String?,
-        ),
+      for (final c in _list(
+        await _dio.get<dynamic>('/api/v1/admin/categories'),
+      ))
+        AdminCategory.fromJson(c),
     ],
   );
 
@@ -232,17 +238,63 @@ class ApiAdminRepository implements AdminRepository {
           '/api/v1/admin/categories',
           data: {'name': name, 'slug': slug},
         );
-        return AdminCategory(r.data!['id'] as int, name, slug);
+        return AdminCategory(r.data!['id'] as int, name, savedSlug: slug);
       });
 
   @override
   Future<AdminCategory> updateCategory(AdminCategory c) => _wrap(() async {
     await _dio.patch<dynamic>(
       '/api/v1/admin/categories/${c.id}',
-      data: {'name': c.name, 'slug': c.slug, 'image_url': c.imageUrl},
+      data: {
+        'name': c.name,
+        'slug': c.slug,
+        'image_url': c.imageUrl,
+        'is_visible': c.isVisible,
+        'position': c.position,
+      },
     );
     return c;
   });
+
+  @override
+  Future<int> bulkProducts(
+    List<int> ids,
+    BulkAction action, {
+    int? categoryId,
+  }) => _wrap(() async {
+    final r = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/admin/products/bulk',
+      data: {'ids': ids, 'action': action.name, 'category_id': categoryId},
+    );
+    return r.data!['affected'] as int;
+  });
+
+  @override
+  Future<List<AdminBrand>> brands() => _wrap(
+    () async => [
+      for (final b in _list(await _dio.get<dynamic>('/api/v1/admin/brands')))
+        AdminBrand.fromJson(b),
+    ],
+  );
+
+  @override
+  Future<AdminBrand> saveBrand(AdminBrand b) => _wrap(() async {
+    final body = {'name': b.name, 'logo_url': b.logoUrl};
+    final r = b.id == null
+        ? await _dio.post<Map<String, dynamic>>(
+            '/api/v1/admin/brands',
+            data: body,
+          )
+        : await _dio.put<Map<String, dynamic>>(
+            '/api/v1/admin/brands/${b.id}',
+            data: body,
+          );
+    return AdminBrand.fromJson(r.data!);
+  });
+
+  @override
+  Future<void> deleteBrand(int id) =>
+      _wrap(() => _dio.delete<dynamic>('/api/v1/admin/brands/$id'));
 
   @override
   Future<List<int>> exportProducts() => _wrap(
@@ -391,7 +443,10 @@ class ApiAdminRepository implements AdminRepository {
     final photos = (j['images_downloaded'] as int? ?? 0) > 0
         ? ', фото загружено: ${j['images_downloaded']}'
         : '';
-    return 'Новых: ${j['created']}, обновлено: ${j['updated']}$photos, с ошибками: ${j['failed']}';
+    final cats = (j['categories_updated'] as int? ?? 0) > 0
+        ? ', категорий: ${j['categories_updated']}'
+        : '';
+    return 'Новых: ${j['created']}, обновлено: ${j['updated']}$photos$cats, с ошибками: ${j['failed']}';
   });
 
   @override
@@ -791,6 +846,13 @@ class DemoAdminRepository implements AdminRepository {
   ];
   late final List<AdminCategory> _categories = [
     for (final c in demoCategories) AdminCategory(c.id, c.name),
+    const AdminCategory(90, 'Бакалея', savedSlug: 'bakaleya', isVisible: false),
+    const AdminCategory(
+      91,
+      'Бытовая химия',
+      savedSlug: 'bytovaya-himiya',
+      isVisible: false,
+    ),
   ];
   late final FinanceData _finance = _generateFinance();
   late final List<TierConfig> _tiers = [
@@ -1008,7 +1070,7 @@ class DemoAdminRepository implements AdminRepository {
 
   @override
   Future<AdminCategory> createCategory(String name, String slug) async {
-    final c = AdminCategory(100 + _categories.length, name, slug);
+    final c = AdminCategory(100 + _categories.length, name, savedSlug: slug);
     _categories.add(c);
     return c;
   }
@@ -1019,6 +1081,61 @@ class DemoAdminRepository implements AdminRepository {
     if (i >= 0) _categories[i] = c;
     return c;
   }
+
+  @override
+  Future<int> bulkProducts(
+    List<int> ids,
+    BulkAction action, {
+    int? categoryId,
+  }) async {
+    final set = ids.toSet();
+    if (action == BulkAction.delete) {
+      _products.removeWhere((p) => set.contains(p.id));
+      return set.length;
+    }
+    for (final (i, p) in _products.indexed) {
+      if (!set.contains(p.id)) continue;
+      _products[i] = switch (action) {
+        BulkAction.hide => p.copyWith(isActive: false),
+        BulkAction.show => p.copyWith(isActive: true),
+        _ => p.copyWith(
+          categoryId: categoryId,
+          clearCategory: categoryId == null,
+        ),
+      };
+    }
+    return set.length;
+  }
+
+  late final List<AdminBrand> _brands = [
+    for (final (i, name) in {for (final p in _products) ?p.brand}.indexed)
+      AdminBrand(
+        id: i + 1,
+        name: name,
+        productsCount: _products.where((p) => p.brand == name).length,
+      ),
+  ];
+
+  @override
+  Future<List<AdminBrand>> brands() async =>
+      List.of(_brands)..sort((a, b) => a.name.compareTo(b.name));
+
+  @override
+  Future<AdminBrand> saveBrand(AdminBrand b) async {
+    final saved = AdminBrand(
+      id: b.id ?? _brands.fold<int>(0, (m, x) => max(m, x.id ?? 0)) + 1,
+      name: b.name,
+      logoUrl: b.logoUrl,
+      productsCount: b.productsCount,
+    );
+    final i = _brands.indexWhere((x) => x.id == saved.id);
+    i < 0 ? _brands.add(saved) : _brands[i] = saved;
+    return saved;
+  }
+
+  @override
+  Future<void> deleteBrand(int id) async =>
+      _brands.removeWhere((b) => b.id == id);
 
   @override
   Future<List<int>> exportProducts() async => utf8.encode(

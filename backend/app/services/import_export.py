@@ -3,6 +3,7 @@ import io
 import secrets
 from enum import Enum
 from typing import Any
+from urllib.parse import urlparse
 
 import pandas as pd
 from pydantic import ValidationError
@@ -11,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models import Category, Product, ProductImage
-from app.schemas.product import ImportReport, ImportRowError, ProductImportRow
+from app.schemas.product import CategoryImportRow, ImportReport, ImportRowError, ProductImportRow
 from app.services import images
 
 MAX_ROWS = 50_000
@@ -44,6 +45,21 @@ COLUMN_ALIASES = {
 }
 REQUIRED_COLUMNS = {"name", "retail_price"}
 
+# Второй лист Excel: категории и их видимость на сайте
+PRODUCTS_SHEET, CATEGORIES_SHEET = "Товары", "Категории"
+CATEGORY_COLUMNS = {
+    "Категория": "name",
+    "Показывать на сайте": "is_visible",
+    "Порядок": "position",
+    "Фото": "image_url",
+}
+CATEGORY_ALIASES = {
+    **{k.lower(): v for k, v in CATEGORY_COLUMNS.items()},
+    "название": "name",
+    "показывать": "is_visible",
+    "на сайте": "is_visible",
+}
+
 
 class FileFormat(str, Enum):
     XLSX = "xlsx"
@@ -71,12 +87,28 @@ def detect_format(filename: str, head: bytes) -> FileFormat:
     raise ImportFileError("Поддерживаются только .xlsx и .csv")
 
 
-def _read_dataframe(content: bytes, fmt: FileFormat) -> pd.DataFrame:
-    """CPU-bound: вызывается в отдельном потоке, чтобы не блокировать event loop."""
+def _clean(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.dropna(how="all")
+    return df.astype(object).where(df.notna(), None)
+
+
+def _read_dataframe(content: bytes, fmt: FileFormat) -> tuple[pd.DataFrame, pd.DataFrame | None]:
+    """CPU-bound: вызывается в отдельном потоке, чтобы не блокировать event loop.
+    Возвращает товары и, если в книге есть лист «Категории», — категории."""
     buf = io.BytesIO(content)
+    categories = None
     if fmt is FileFormat.XLSX:
         # dtype=str — не даём pandas «угадывать» типы (артикул 00123 → 123). Типы приводит Pydantic.
-        df = pd.read_excel(buf, engine="openpyxl", dtype=str, nrows=MAX_ROWS + 1)
+        sheets = pd.read_excel(buf, engine="openpyxl", dtype=str, nrows=MAX_ROWS + 1, sheet_name=None)
+        df = sheets.get(PRODUCTS_SHEET)
+        if df is None:
+            df = next(v for k, v in sheets.items() if k != CATEGORIES_SHEET) if len(sheets) > 1 else next(
+                iter(sheets.values())
+            )
+        if (cats := sheets.get(CATEGORIES_SHEET)) is not None and cats is not df:
+            cats.columns = [CATEGORY_ALIASES.get(str(c).strip().lower(), str(c).strip().lower()) for c in cats.columns]
+            if "name" in cats.columns:
+                categories = _clean(cats)
     else:
         df = pd.read_csv(buf, dtype=str, sep=None, engine="python", encoding="utf-8-sig", nrows=MAX_ROWS + 1)
     if len(df) > MAX_ROWS:
@@ -86,8 +118,7 @@ def _read_dataframe(content: bytes, fmt: FileFormat) -> pd.DataFrame:
     if missing:
         names = {v: k for k, v in EXPORT_COLUMNS.items()}
         raise ImportFileError("В файле нет колонок: " + ", ".join(names[m] for m in sorted(missing)))
-    df = df.dropna(how="all")
-    return df.astype(object).where(df.notna(), None)
+    return _clean(df), categories
 
 
 def _fmt_errors(exc: ValidationError) -> list[str]:
@@ -135,7 +166,7 @@ class ProductImportService:
 
     async def import_file(self, filename: str, content: bytes, *, dry_run: bool = False) -> ImportReport:
         fmt = detect_format(filename, content[:8])
-        df = await asyncio.to_thread(_read_dataframe, content, fmt)
+        df, cat_df = await asyncio.to_thread(_read_dataframe, content, fmt)
         present = set(df.columns)
 
         products = list((await self.session.scalars(select(Product))).unique().all())
@@ -216,6 +247,34 @@ class ProductImportService:
                 product.images = [ProductImage(url=url, position=0)]
                 downloaded += 1
 
+        cats_updated = 0
+        for idx, raw in enumerate(cat_df.to_dict(orient="records") if cat_df is not None else []):
+            file_row = idx + 2
+            try:
+                row = CategoryImportRow.model_validate(raw)
+            except ValidationError as exc:
+                errors.append(
+                    ImportRowError(row=file_row, sku=None, name=f"Категории: {raw.get('name') or ''}", errors=_fmt_errors(exc))
+                )
+                continue
+            cats_updated += 1
+            if dry_run:
+                continue
+            cat = await self._category(row.name, categories, dry_run)
+            if row.is_visible is not None:
+                cat.is_visible = row.is_visible
+            if row.position is not None:
+                cat.position = row.position
+            if row.image_url:
+                if images.is_own(row.image_url):
+                    cat.image_url = urlparse(row.image_url).path
+                elif downloaded < MAX_DOWNLOADS:
+                    try:
+                        cat.image_url, _, _ = images.store(await images.download(row.image_url), "products")
+                        downloaded += 1
+                    except (images.ImageError, OSError) as exc:
+                        warnings.append(f"Категории, строка {file_row}: фото «{row.name}» не загружено — {exc}")
+
         if not dry_run:
             await self.session.flush()
 
@@ -224,6 +283,7 @@ class ProductImportService:
             created=created,
             updated=updated,
             images_downloaded=downloaded,
+            categories_updated=cats_updated,
             failed=len(errors),
             dry_run=dry_run,
             errors=errors[:500],
@@ -253,7 +313,17 @@ class ProductImportService:
                     "Описание": p.description,
                 }
             )
-        return await asyncio.to_thread(_write_dataframe, records, fmt)
+        cats = (await self.session.scalars(select(Category).order_by(Category.position, Category.name))).all()
+        cat_records = [
+            {
+                "Категория": c.name,
+                "Показывать на сайте": "да" if c.is_visible else "нет",
+                "Порядок": c.position,
+                "Фото": f"{base}{c.image_url}" if c.image_url and c.image_url.startswith("/") else c.image_url,
+            }
+            for c in cats
+        ]
+        return await asyncio.to_thread(_write_dataframe, records, fmt, cat_records)
 
 
 def _neutralize_formula(v):
@@ -263,14 +333,20 @@ def _neutralize_formula(v):
     return v
 
 
-def _write_dataframe(records: list[dict[str, Any]], fmt: FileFormat) -> bytes:
+def _write_dataframe(records: list[dict[str, Any]], fmt: FileFormat, cat_records: list[dict[str, Any]] = ()) -> bytes:
     df = pd.DataFrame.from_records(records, columns=list(EXPORT_COLUMNS)).map(_neutralize_formula)
     buf = io.BytesIO()
     if fmt is FileFormat.XLSX:
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Товары")
-            sheet = writer.sheets["Товары"]
+            df.to_excel(writer, index=False, sheet_name=PRODUCTS_SHEET)
+            sheet = writer.sheets[PRODUCTS_SHEET]
             for col, width in zip("ABCDEFGHIJKLM", (12, 36, 10, 20, 18, 14, 10, 12, 13, 10, 10, 50, 40), strict=True):
+                sheet.column_dimensions[col].width = width
+            sheet.freeze_panes = "A2"
+            cats = pd.DataFrame.from_records(list(cat_records), columns=list(CATEGORY_COLUMNS)).map(_neutralize_formula)
+            cats.to_excel(writer, index=False, sheet_name=CATEGORIES_SHEET)
+            sheet = writer.sheets[CATEGORIES_SHEET]
+            for col, width in zip("ABCD", (28, 20, 10, 50), strict=True):
                 sheet.column_dimensions[col].width = width
             sheet.freeze_panes = "A2"
     else:

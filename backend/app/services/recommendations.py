@@ -80,7 +80,7 @@ def rank_candidates(
 
 
 def _sellable():
-    return (Product.is_active, Product.stock > 0)
+    return (Product.listed, Product.stock > 0)
 
 
 class RecommendationService:

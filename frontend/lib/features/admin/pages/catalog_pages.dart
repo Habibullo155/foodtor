@@ -13,6 +13,7 @@ import '../data/admin_data.dart';
 import '../data/admin_repository.dart';
 import '../rbac.dart';
 import '../widgets/admin_widgets.dart';
+import 'brands_dialog.dart';
 import 'categories_dialog.dart';
 
 class _ProductQuery extends Notifier<(String, int?)> {
@@ -23,6 +24,19 @@ class _ProductQuery extends Notifier<(String, int?)> {
 
 final _productQueryProvider = NotifierProvider<_ProductQuery, (String, int?)>(
   _ProductQuery.new,
+);
+
+class _Selection extends Notifier<Set<int>> {
+  @override
+  Set<int> build() => const {};
+  void toggle(int id) =>
+      state = state.contains(id) ? ({...state}..remove(id)) : {...state, id};
+  void setAll(Iterable<int> ids) => state = ids.toSet();
+  void clear() => state = const {};
+}
+
+final _selectionProvider = NotifierProvider<_Selection, Set<int>>(
+  _Selection.new,
 );
 
 class ProductsPage extends ConsumerWidget {
@@ -73,7 +87,10 @@ class ProductsPage extends ConsumerWidget {
               dropdownMenuEntries: [
                 const DropdownMenuEntry(value: null, label: 'Все категории'),
                 for (final c in categories)
-                  DropdownMenuEntry(value: c.id, label: c.name),
+                  DropdownMenuEntry(
+                    value: c.id,
+                    label: c.isVisible ? c.name : '${c.name} (скрыта)',
+                  ),
               ],
             ),
             if (canExport)
@@ -93,6 +110,11 @@ class ProductsPage extends ConsumerWidget {
                 onPressed: () => showCategoriesManager(context),
                 icon: const Icon(Icons.category_outlined),
                 label: const Text('Категории'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => showBrandsManager(context),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text('Фирмы'),
               ),
               FilledButton.icon(
                 onPressed: () => showProductEditor(context, ref),
@@ -114,7 +136,7 @@ class ProductsPage extends ConsumerWidget {
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Нажмите на товар или ✎, чтобы изменить название, цену, себестоимость, остаток, фото или скрыть его',
+                  'Нажмите на товар, чтобы изменить его. Отметьте несколько галочками — чтобы снять с продажи, перенести или удалить разом',
                   style: TextStyle(
                     color: context.palette.textSecondary,
                     fontSize: 13,
@@ -125,6 +147,7 @@ class ProductsPage extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: Insets.lg),
+        if (canWrite) _BulkBar(visible: items),
         AdminCard(
           padding: EdgeInsets.zero,
           child: items.isEmpty
@@ -257,6 +280,7 @@ class _ProductEditorState extends ConsumerState<_ProductEditor> {
     text: p?.sku ?? 'GR-${DateTime.now().millisecondsSinceEpoch % 100000}',
   );
   late final _brand = TextEditingController(text: p?.brand);
+  final _brandFocus = FocusNode();
   late final _unit = TextEditingController(text: p?.unit);
   late final _cost = TextEditingController(text: p?.cost.toStringAsFixed(0));
   late final _price = TextEditingController(text: p?.price.toStringAsFixed(0));
@@ -275,6 +299,12 @@ class _ProductEditorState extends ConsumerState<_ProductEditor> {
       p?.imageUrl; // текущее фото: загруженное, ссылка или демо-ассет
   bool _uploading = false;
   String? _photoError;
+
+  @override
+  void dispose() {
+    _brandFocus.dispose();
+    super.dispose();
+  }
 
   /// Фото с компьютера: проверяем размер ещё до отправки, сервер проверит ещё раз и пересохранит.
   Future<void> _pickPhoto() async {
@@ -359,6 +389,7 @@ class _ProductEditorState extends ConsumerState<_ProductEditor> {
     final cost = _num(_cost) ?? 0, price = _num(_price) ?? 0;
     final margin = price == 0 ? 0.0 : (price - cost) / price * 100;
     final categories = ref.watch(adminCategoriesProvider);
+    final brands = ref.watch(brandsProvider);
     String? required(String? v) =>
         (v ?? '').trim().isEmpty ? 'Обязательное поле' : null;
     String? number(String? v) =>
@@ -414,11 +445,51 @@ class _ProductEditorState extends ConsumerState<_ProductEditor> {
                 Row(
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        controller: _brand,
-                        decoration: const InputDecoration(
-                          labelText: 'Производитель',
-                        ),
+                      child: RawAutocomplete<String>(
+                        textEditingController: _brand,
+                        focusNode: _brandFocus,
+                        optionsBuilder: (v) {
+                          final q = v.text.trim().toLowerCase();
+                          return [
+                            for (final b in brands)
+                              if (b.name.toLowerCase().contains(q)) b.name,
+                          ];
+                        },
+                        fieldViewBuilder: (_, controller, focus, _) =>
+                            TextFormField(
+                              controller: controller,
+                              focusNode: focus,
+                              decoration: const InputDecoration(
+                                labelText: 'Производитель',
+                                hintText: 'Выберите или впишите новую',
+                              ),
+                            ),
+                        optionsViewBuilder: (context, onSelected, options) =>
+                            Align(
+                              alignment: Alignment.topLeft,
+                              child: Material(
+                                elevation: 4,
+                                borderRadius: BorderRadius.circular(Radii.md),
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxHeight: 240,
+                                    maxWidth: 280,
+                                  ),
+                                  child: ListView(
+                                    padding: EdgeInsets.zero,
+                                    shrinkWrap: true,
+                                    children: [
+                                      for (final o in options)
+                                        ListTile(
+                                          dense: true,
+                                          title: Text(o),
+                                          onTap: () => onSelected(o),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
                       ),
                     ),
                     const SizedBox(width: Insets.md),
@@ -616,6 +687,9 @@ class _ProductsTable extends ConsumerWidget {
     final cats = {
       for (final c in ref.watch(adminCategoriesProvider)) c.id: c.name,
     };
+    final selected = ref.watch(_selectionProvider);
+    final allSelected = items.every((p) => selected.contains(p.id));
+    final someSelected = items.any((p) => selected.contains(p.id));
     Widget num(String s, {Color? color, bool bold = false}) => SizedBox(
       width: 100,
       child: Text(
@@ -643,6 +717,19 @@ class _ProductsTable extends ConsumerWidget {
           ),
           child: Row(
             children: [
+              if (canWrite)
+                SizedBox(
+                  width: 40,
+                  child: Checkbox(
+                    tristate: true,
+                    value: allSelected ? true : (someSelected ? null : false),
+                    onChanged: (_) => allSelected
+                        ? ref.read(_selectionProvider.notifier).clear()
+                        : ref
+                              .read(_selectionProvider.notifier)
+                              .setAll(items.map((p) => p.id)),
+                  ),
+                ),
               Expanded(flex: 4, child: Text('ТОВАР', style: head)),
               Expanded(flex: 2, child: Text('КАТЕГОРИЯ', style: head)),
               SizedBox(
@@ -678,6 +765,16 @@ class _ProductsTable extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
+                    if (canWrite)
+                      SizedBox(
+                        width: 40,
+                        child: Checkbox(
+                          value: selected.contains(item.id),
+                          onChanged: (_) => ref
+                              .read(_selectionProvider.notifier)
+                              .toggle(item.id),
+                        ),
+                      ),
                     Expanded(
                       flex: 4,
                       child: Row(
@@ -718,7 +815,9 @@ class _ProductsTable extends ConsumerWidget {
                     Expanded(
                       flex: 2,
                       child: Text(
-                        cats[item.categoryId] ?? '—',
+                        item.isActive
+                            ? cats[item.categoryId] ?? '—'
+                            : '${cats[item.categoryId] ?? '—'} · снят с продажи',
                         style: TextStyle(color: context.palette.textSecondary),
                       ),
                     ),
@@ -764,31 +863,198 @@ class _ProductsList extends ConsumerWidget {
   final bool canWrite;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Column(
-    children: [
-      for (final item in items)
-        ListTile(
-          onTap: canWrite ? () => showProductEditor(context, ref, item) : null,
-          leading: ProductThumb(item.imageUrl, size: 44),
-          title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(
-            '${money.format(item.price)} · себест. ${money.format(item.cost)}',
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _StockPill(item.stock),
-              if (canWrite)
-                IconButton(
-                  tooltip: 'Изменить товар',
-                  onPressed: () => showProductEditor(context, ref, item),
-                  icon: const Icon(Icons.edit_outlined, size: 20),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(_selectionProvider);
+    return Column(
+      children: [
+        for (final item in items)
+          ListTile(
+            onTap: canWrite
+                ? () => showProductEditor(context, ref, item)
+                : null,
+            leading: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canWrite)
+                  Checkbox(
+                    value: selected.contains(item.id),
+                    onChanged: (_) =>
+                        ref.read(_selectionProvider.notifier).toggle(item.id),
+                  ),
+                Opacity(
+                  opacity: item.isActive ? 1 : 0.4,
+                  child: ProductThumb(item.imageUrl, size: 44),
                 ),
-            ],
+              ],
+            ),
+            title: Text(
+              item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              '${money.format(item.price)} · себест. ${money.format(item.cost)}',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _StockPill(item.stock),
+                if (canWrite)
+                  IconButton(
+                    tooltip: 'Изменить товар',
+                    onPressed: () => showProductEditor(context, ref, item),
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                  ),
+              ],
+            ),
           ),
+      ],
+    );
+  }
+}
+
+/// Панель над списком, когда отмечены товары: снять с продажи, вернуть, перенести, удалить.
+class _BulkBar extends ConsumerWidget {
+  const _BulkBar({required this.visible});
+  final List<AdminProduct> visible;
+
+  Future<void> _run(
+    BuildContext context,
+    WidgetRef ref,
+    Set<int> ids,
+    BulkAction action, {
+    int? categoryId,
+    required String done,
+  }) async {
+    final n = await ref
+        .read(adminProductsProvider.notifier)
+        .bulk(ids, action, categoryId: categoryId);
+    if (n == null || !context.mounted) return;
+    ref.read(_selectionProvider.notifier).clear();
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('$done: $n')));
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    Set<int> ids,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Удалить товары (${ids.length})?'),
+        content: const Text(
+          'Товары исчезнут из магазина и админки навсегда. В прошлых заказах останутся их названия и цены.\n\n'
+          'Если товар может вернуться — лучше «Снять с продажи».',
         ),
-    ],
-  );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.lowStock),
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Удалить'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      await _run(context, ref, ids, BulkAction.delete, done: 'Удалено');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // выделение, скрытое фильтром, не трогаем — действуем только на то, что видно
+    final shown = {for (final p in visible) p.id};
+    final ids = ref.watch(_selectionProvider).intersection(shown);
+    if (ids.isEmpty) return const SizedBox.shrink();
+    final categories = ref.watch(adminCategoriesProvider);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Insets.md),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Insets.lg,
+          vertical: Insets.sm,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.brand.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(Radii.lg),
+          border: Border.all(color: AppColors.brand.withValues(alpha: 0.25)),
+        ),
+        child: Wrap(
+          spacing: Insets.sm,
+          runSpacing: Insets.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              'Выбрано: ${ids.length}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: Insets.sm),
+            OutlinedButton.icon(
+              onPressed: () => _run(
+                context,
+                ref,
+                ids,
+                BulkAction.hide,
+                done: 'Снято с продажи',
+              ),
+              icon: const Icon(Icons.visibility_off_outlined, size: 18),
+              label: const Text('Снять с продажи'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () => _run(
+                context,
+                ref,
+                ids,
+                BulkAction.show,
+                done: 'Возвращено в продажу',
+              ),
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('Вернуть в продажу'),
+            ),
+            MenuAnchor(
+              menuChildren: [
+                for (final c in categories)
+                  MenuItemButton(
+                    onPressed: () => _run(
+                      context,
+                      ref,
+                      ids,
+                      BulkAction.move,
+                      categoryId: c.id,
+                      done: 'Перенесено в «${c.name}»',
+                    ),
+                    child: Text(c.isVisible ? c.name : '${c.name} (скрыта)'),
+                  ),
+              ],
+              builder: (_, menu, _) => OutlinedButton.icon(
+                onPressed: () => menu.isOpen ? menu.close() : menu.open(),
+                icon: const Icon(Icons.drive_file_move_outlined, size: 18),
+                label: const Text('В категорию'),
+              ),
+            ),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.lowStock,
+              ),
+              onPressed: () => _delete(context, ref, ids),
+              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              label: const Text('Удалить'),
+            ),
+            TextButton(
+              onPressed: () => ref.read(_selectionProvider.notifier).clear(),
+              child: const Text('Снять выделение'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 enum _RatingFilter {

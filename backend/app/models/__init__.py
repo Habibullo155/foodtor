@@ -15,7 +15,7 @@ from app.models.order import (
     PaymentStatus,
 )
 from app.models.pricing import CategoryDiscount, PriceList, PriceListItem
-from app.models.product import CartItem, Category, Favorite, Product, ProductImage, ProductRelation, RelationKind
+from app.models.product import Brand, CartItem, Category, Favorite, Product, ProductImage, ProductRelation, RelationKind
 from app.models.promo import PromoCode
 from app.models.review import Review, ReviewStatus
 from app.models.settings import ShopSettings
@@ -55,6 +55,7 @@ __all__ = [
     "ProductRelation",
     "RelationKind",
     "CartItem",
+    "Brand",
     "Category",
     "DiscountType",
     "Expense",

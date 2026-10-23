@@ -34,7 +34,8 @@ class _CategoriesManager extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Фото категории показывается в круглой плитке на главной сайта. Лучше квадратное, на светлом или прозрачном фоне.',
+              'Фото категории показывается в плитке на главной сайта — лучше квадратное, на светлом фоне. '
+              'Выключенная категория скрыта от покупателей вместе со всеми товарами: так можно заранее готовить ассортимент.',
               style: muted,
             ),
             const SizedBox(height: Insets.md),
@@ -68,13 +69,35 @@ class _CategoriesManager extends ConsumerWidget {
                           ),
                           title: Text(c.name),
                           subtitle: Text(
-                            c.imageUrl == null ? 'Без фото' : c.url,
-                            style: muted,
+                            [
+                              '${c.productsCount} ${_goods(c.productsCount)}',
+                              if (!c.isVisible) 'скрыта от покупателей',
+                              if (c.imageUrl == null) 'без фото',
+                            ].join(' · '),
+                            style: muted.copyWith(
+                              color: c.isVisible ? null : AppColors.hit,
+                            ),
                           ),
-                          trailing: IconButton(
-                            tooltip: 'Изменить',
-                            onPressed: () => _edit(context, c),
-                            icon: const Icon(Icons.edit_outlined),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Tooltip(
+                                message: c.isVisible
+                                    ? 'Показывается на сайте'
+                                    : 'Скрыта на сайте',
+                                child: Switch(
+                                  value: c.isVisible,
+                                  onChanged: (v) => ref
+                                      .read(adminCategoriesProvider.notifier)
+                                      .save(c.copyWith(isVisible: v)),
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Изменить',
+                                onPressed: () => _edit(context, c),
+                                icon: const Icon(Icons.edit_outlined),
+                              ),
+                            ],
                           ),
                           onTap: () => _edit(context, c),
                         );
@@ -99,6 +122,16 @@ class _CategoriesManager extends ConsumerWidget {
   }
 }
 
+String _goods(int n) {
+  final d = n % 100;
+  if (d >= 11 && d <= 14) return 'товаров';
+  return switch (n % 10) {
+    1 => 'товар',
+    2 || 3 || 4 => 'товара',
+    _ => 'товаров',
+  };
+}
+
 class _CategoryEditor extends ConsumerStatefulWidget {
   const _CategoryEditor({this.category});
   final AdminCategory? category;
@@ -110,6 +143,7 @@ class _CategoryEditor extends ConsumerStatefulWidget {
 class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
   late final _name = TextEditingController(text: widget.category?.name);
   late String? _photo = widget.category?.imageUrl;
+  late bool _visible = widget.category?.isVisible ?? true;
   bool _busy = false;
 
   @override
@@ -132,7 +166,12 @@ class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
       }
     }
     final ok = await n.save(
-      c.copyWith(name: name, imageUrl: _photo, clearImage: _photo == null),
+      c.copyWith(
+        name: name,
+        imageUrl: _photo,
+        clearImage: _photo == null,
+        isVisible: _visible,
+      ),
     );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -161,6 +200,15 @@ class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
           PhotoField(
             value: _photo,
             onChanged: (v) => setState(() => _photo = v),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Показывать на сайте'),
+            subtitle: const Text(
+              'Выключите, чтобы скрыть категорию и все её товары',
+            ),
+            value: _visible,
+            onChanged: (v) => setState(() => _visible = v),
           ),
         ],
       ),

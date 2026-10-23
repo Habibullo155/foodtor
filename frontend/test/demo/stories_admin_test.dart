@@ -20,7 +20,10 @@ void main() {
       const AdminCategory(1, 'Крупы и бобовые').url,
       '/catalog/krupy-i-bobovye',
     );
-    expect(const AdminCategory(1, 'Ягоды', 'yagody').url, '/catalog/yagody');
+    expect(
+      const AdminCategory(1, 'Ягоды', savedSlug: 'yagody').url,
+      '/catalog/yagody',
+    );
   });
 
   testWidgets('stories: list, reorder, hide, edit, delete', (tester) async {

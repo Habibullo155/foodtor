@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-from sqlalchemy import Date, cast, func, select, update
+from sqlalchemy import Date, cast, delete, func, select, update
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import PermissionsDep, SessionDep, require
@@ -16,6 +16,7 @@ from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.core.security import hash_password, password_problem
 from app.models import (
+    Brand,
     Category,
     DiscountType,
     Expense,
@@ -273,12 +274,58 @@ async def archive_product(product_id: int, session: SessionDep):
     product.is_active = False
 
 
+class BulkIn(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=2000)
+    action: Literal["hide", "show", "delete", "move"]
+    category_id: int | None = None
+
+
+@router.post("/products/bulk", dependencies=[guard(Permission.PRODUCTS_WRITE)])
+async def bulk_products(body: BulkIn, session: SessionDep):
+    """Действие над выделенными товарами. Удаление настоящее: в заказах остаются снимки названия и цены."""
+    where = Product.id.in_(body.ids)
+    if body.action == "delete":
+        result = await session.execute(delete(Product).where(where))
+    elif body.action == "move":
+        if body.category_id is not None and await session.get(Category, body.category_id) is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
+        result = await session.execute(update(Product).where(where).values(category_id=body.category_id))
+    else:
+        result = await session.execute(update(Product).where(where).values(is_active=body.action == "show"))
+    return {"affected": result.rowcount}
+
+
+class AdminCategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    slug: str
+    parent_id: int | None
+    image_url: str | None
+    position: int
+    is_visible: bool
+    products_count: int = 0
+
+
+@router.get("/categories", response_model=list[AdminCategoryOut], dependencies=[guard(Permission.PRODUCTS_READ)])
+async def admin_categories(session: SessionDep):
+    counts = dict(
+        (await session.execute(select(Product.category_id, func.count()).group_by(Product.category_id))).tuples().all()
+    )
+    cats = (await session.scalars(select(Category).order_by(Category.position, Category.name))).all()
+    out = [AdminCategoryOut.model_validate(c) for c in cats]
+    for c in out:
+        c.products_count = counts.get(c.id, 0)
+    return out
+
+
 class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str = Field(min_length=1, max_length=140, pattern=r"^[a-z0-9\-]+$")
     parent_id: int | None = None
     image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/|/static/)")
     position: int = 0
+    is_visible: bool = True
 
 
 @router.post("/categories", status_code=201, dependencies=[guard(Permission.PRODUCTS_WRITE)])
@@ -307,6 +354,80 @@ async def delete_category(category_id: int, session: SessionDep):
     if c is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Category not found")
     await session.delete(c)  # товары остаются без категории (FK ON DELETE SET NULL)
+
+
+class BrandOut(BaseModel):
+    id: int | None
+    name: str
+    logo_url: str | None = None
+    products_count: int = 0
+
+
+class BrandIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    logo_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/|/static/)")
+
+
+@router.get("/brands", response_model=list[BrandOut], dependencies=[guard(Permission.PRODUCTS_READ)])
+async def brands(session: SessionDep):
+    """Фирмы из справочника плюс те, что пришли с товарами из Excel и ещё не внесены в список."""
+    counts = dict(
+        (
+            await session.execute(
+                select(Product.brand, func.count()).where(Product.brand.is_not(None)).group_by(Product.brand)
+            )
+        )
+        .tuples()
+        .all()
+    )
+    out = [
+        BrandOut(id=b.id, name=b.name, logo_url=b.logo_url, products_count=counts.pop(b.name, 0))
+        for b in (await session.scalars(select(Brand))).all()
+    ]
+    out += [BrandOut(id=None, name=name, products_count=n) for name, n in counts.items() if name.strip()]
+    return sorted(out, key=lambda b: b.name.lower())
+
+
+async def _brand_name_free(session, name: str, brand_id: int | None = None) -> None:
+    taken = await session.scalar(select(Brand.id).where(func.lower(Brand.name) == name.lower()))
+    if taken is not None and taken != brand_id:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Brand already exists")
+
+
+@router.post("/brands", response_model=BrandOut, status_code=201, dependencies=[guard(Permission.PRODUCTS_WRITE)])
+async def create_brand(body: BrandIn, session: SessionDep):
+    name = body.name.strip()
+    await _brand_name_free(session, name)
+    b = Brand(name=name, logo_url=body.logo_url)
+    session.add(b)
+    await session.flush()
+    count = await session.scalar(select(func.count()).where(Product.brand == name))
+    return BrandOut(id=b.id, name=b.name, logo_url=b.logo_url, products_count=count or 0)
+
+
+@router.put("/brands/{brand_id}", response_model=BrandOut, dependencies=[guard(Permission.PRODUCTS_WRITE)])
+async def update_brand(brand_id: int, body: BrandIn, session: SessionDep):
+    """Переименование сразу меняет фирму у всех её товаров."""
+    b = await session.get(Brand, brand_id)
+    if b is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
+    name = body.name.strip()
+    await _brand_name_free(session, name, brand_id)
+    if name != b.name:
+        await session.execute(update(Product).where(Product.brand == b.name).values(brand=name))
+    b.name, b.logo_url = name, body.logo_url
+    count = await session.scalar(select(func.count()).where(Product.brand == name))
+    return BrandOut(id=b.id, name=b.name, logo_url=b.logo_url, products_count=count or 0)
+
+
+@router.delete("/brands/{brand_id}", status_code=204, dependencies=[guard(Permission.PRODUCTS_WRITE)])
+async def delete_brand(brand_id: int, session: SessionDep):
+    """Убирает фирму из списка и у товаров — иначе она вернулась бы в список вместе с ними."""
+    b = await session.get(Brand, brand_id)
+    if b is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
+    await session.execute(update(Product).where(Product.brand == b.name).values(brand=None))
+    await session.delete(b)
 
 
 class AdminReviewOut(BaseModel):

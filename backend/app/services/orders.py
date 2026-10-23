@@ -67,7 +67,7 @@ class OrderService:
         items: list[LineRequest] = []
         for product_id, qty in merged.items():
             product = locked.get(product_id)
-            if product is None or not product.is_active:
+            if product is None or not product.listed:
                 raise OrderError(f"Product {product_id} is not available")
             if product.stock < qty:
                 raise OrderError(f"Not enough stock for {product.name}")

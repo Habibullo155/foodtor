@@ -79,6 +79,32 @@ class ProductImportRow(BaseModel):
         return self
 
 
+class CategoryImportRow(BaseModel):
+    """Строка листа «Категории»: видимость на сайте, порядок и фото."""
+
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    name: Annotated[str, StringConstraints(min_length=1, max_length=120)]
+    is_visible: bool | None = None
+    position: Annotated[int, Field(ge=0, le=10_000)] | None = None
+    image_url: Annotated[str, StringConstraints(max_length=1024)] | None = None
+
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def _blank_to_none(cls, v: object) -> object:
+        return ProductImportRow._blank_to_none(v)
+
+    @field_validator("is_visible", mode="before")
+    @classmethod
+    def _bool(cls, v: object) -> object:
+        return ProductImportRow._bool(v)
+
+    @field_validator("position", mode="before")
+    @classmethod
+    def _int(cls, v: object) -> object:
+        return ProductImportRow._int(v)
+
+
 class ImportRowError(BaseModel):
     row: int  # номер строки в файле (с учётом заголовка) — удобно для пользователя
     sku: str | None
@@ -91,6 +117,7 @@ class ImportReport(BaseModel):
     created: int
     updated: int
     images_downloaded: int = 0
+    categories_updated: int = 0
     failed: int
     dry_run: bool
     errors: list[ImportRowError]

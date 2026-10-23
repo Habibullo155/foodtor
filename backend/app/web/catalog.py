@@ -103,22 +103,24 @@ async def categories(session: AsyncSession) -> list[tuple[Category, int]]:
     counts = dict(
         (
             await session.execute(
-                select(Product.category_id, func.count()).where(Product.is_active).group_by(Product.category_id)
+                select(Product.category_id, func.count()).where(Product.listed).group_by(Product.category_id)
             )
         )
         .tuples()
         .all()
     )
-    cats = (await session.scalars(select(Category).order_by(Category.position, Category.name))).all()
+    cats = (
+        await session.scalars(select(Category).where(Category.is_visible).order_by(Category.position, Category.name))
+    ).all()
     return [(c, counts.get(c.id, 0)) for c in cats if counts.get(c.id)]
 
 
 async def category_by_slug(session: AsyncSession, slug: str) -> Category | None:
-    return await session.scalar(select(Category).where(Category.slug == slug))
+    return await session.scalar(select(Category).where(Category.slug == slug, Category.is_visible))
 
 
 async def catalog(session: AsyncSession, f: Filters) -> CatalogPage:
-    base = [Product.is_active]
+    base = [Product.listed]
     if f.q:
         pattern = "%" + f.q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
         base.append(or_(Product.name.ilike(pattern), Product.brand.ilike(pattern)))
@@ -195,7 +197,7 @@ async def catalog(session: AsyncSession, f: Filters) -> CatalogPage:
 async def rail(
     session: AsyncSession, *, hits: bool = False, sale: bool = False, limit: int = 12
 ) -> list[ProductSummaryOut]:
-    conds = [Product.is_active, Product.stock > 0]
+    conds = [Product.listed, Product.stock > 0]
     if hits:
         conds.append(Product.is_hit)
     order = [Product.id]
@@ -231,6 +233,6 @@ async def product_reviews(session: AsyncSession, product_id: int, limit: int = 2
 
 
 async def all_for_sitemap(session: AsyncSession) -> tuple[list[Category], list[Product]]:
-    cats = (await session.scalars(select(Category))).all()
-    prods = (await session.scalars(select(Product).where(Product.is_active))).unique().all()
+    cats = (await session.scalars(select(Category).where(Category.is_visible))).all()
+    prods = (await session.scalars(select(Product).where(Product.listed))).unique().all()
     return list(cats), list(prods)

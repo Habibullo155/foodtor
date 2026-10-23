@@ -229,27 +229,81 @@ class FinanceData {
 
 @immutable
 class AdminCategory {
-  const AdminCategory(this.id, this.name, [String? slug, this.imageUrl])
-    : _slug = slug;
+  const AdminCategory(
+    this.id,
+    this.name, {
+    this.savedSlug,
+    this.imageUrl,
+    this.isVisible = true,
+    this.position = 0,
+    this.productsCount = 0,
+  });
   final int id;
   final String name;
-  final String? _slug;
+
+  /// slug с сервера; у новой категории его ещё нет — берём из названия.
+  final String? savedSlug;
   final String? imageUrl;
 
-  String get slug => _slug ?? slugify(name);
+  /// Скрытая категория не видна покупателям вместе со всеми своими товарами.
+  final bool isVisible;
+  final int position;
+  final int productsCount;
+
+  String get slug => savedSlug ?? slugify(name);
   String get url => '/catalog/$slug';
+
+  factory AdminCategory.fromJson(Map<String, dynamic> j) => AdminCategory(
+    j['id'] as int,
+    j['name'] as String,
+    savedSlug: j['slug'] as String?,
+    imageUrl: j['image_url'] as String?,
+    isVisible: j['is_visible'] as bool? ?? true,
+    position: j['position'] as int? ?? 0,
+    productsCount: j['products_count'] as int? ?? 0,
+  );
 
   AdminCategory copyWith({
     String? name,
     String? imageUrl,
     bool clearImage = false,
+    bool? isVisible,
+    int? productsCount,
   }) => AdminCategory(
     id,
     name ?? this.name,
-    _slug,
-    clearImage ? null : (imageUrl ?? this.imageUrl),
+    savedSlug: savedSlug,
+    imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
+    isVisible: isVisible ?? this.isVisible,
+    position: position,
+    productsCount: productsCount ?? this.productsCount,
   );
 }
+
+/// Фирма-производитель. id == null — фирма есть у товаров (пришла из Excel), но ещё не в справочнике.
+@immutable
+class AdminBrand {
+  const AdminBrand({
+    required this.id,
+    required this.name,
+    this.logoUrl,
+    this.productsCount = 0,
+  });
+  final int? id;
+  final String name;
+  final String? logoUrl;
+  final int productsCount;
+
+  factory AdminBrand.fromJson(Map<String, dynamic> j) => AdminBrand(
+    id: j['id'] as int?,
+    name: j['name'] as String,
+    logoUrl: j['logo_url'] as String?,
+    productsCount: j['products_count'] as int? ?? 0,
+  );
+}
+
+/// Что сделать с выделенными товарами.
+enum BulkAction { hide, show, move, delete }
 
 const _tr = {
   'а': 'a',
@@ -331,6 +385,27 @@ class AdminProduct {
   final String description;
 
   double get marginPercent => price == 0 ? 0 : (price - cost) / price * 100;
+
+  AdminProduct copyWith({
+    bool? isActive,
+    int? categoryId,
+    bool clearCategory = false,
+  }) => AdminProduct(
+    id: id,
+    sku: sku,
+    name: name,
+    price: price,
+    cost: cost,
+    stock: stock,
+    wholesalePrice: wholesalePrice,
+    unit: unit,
+    brand: brand,
+    imageUrl: imageUrl,
+    categoryId: clearCategory ? null : (categoryId ?? this.categoryId),
+    isActive: isActive ?? this.isActive,
+    isHit: isHit,
+    description: description,
+  );
 
   factory AdminProduct.fromJson(Map<String, dynamic> j) => AdminProduct(
     id: j['id'] as int,

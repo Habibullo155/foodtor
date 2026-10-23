@@ -230,10 +230,27 @@ class AdminProductsNotifier extends RemoteListNotifier<AdminProduct> {
     }
   }
 
+  Future<int?> bulk(Set<int> ids, BulkAction action, {int? categoryId}) async {
+    try {
+      final n = await repo.bulkProducts(
+        ids.toList(),
+        action,
+        categoryId: categoryId,
+      );
+      await reload();
+      unawaited(ref.read(adminCategoriesProvider.notifier).reload());
+      return n;
+    } catch (e) {
+      ref.read(adminErrorProvider.notifier).report(e);
+      return null;
+    }
+  }
+
   Future<String?> import(String filename, List<int> bytes) async {
     try {
       final report = await repo.importProducts(filename, bytes);
       unawaited(reload());
+      unawaited(ref.read(adminCategoriesProvider.notifier).reload());
       return report;
     } catch (e) {
       ref.read(adminErrorProvider.notifier).report(e);
@@ -278,6 +295,38 @@ final adminCategoriesProvider =
     NotifierProvider<AdminCategoriesNotifier, List<AdminCategory>>(
       AdminCategoriesNotifier.new,
     );
+
+class BrandsNotifier extends RemoteListNotifier<AdminBrand> {
+  @override
+  Future<List<AdminBrand>> fetch(AdminRepository repo) => repo.brands();
+
+  Future<bool> save(AdminBrand b) async {
+    try {
+      await repo.saveBrand(b);
+      await reload();
+      // переименование меняет фирму у товаров
+      unawaited(ref.read(adminProductsProvider.notifier).reload());
+      return true;
+    } catch (e) {
+      ref.read(adminErrorProvider.notifier).report(e);
+      return false;
+    }
+  }
+
+  Future<void> delete(int id) async {
+    try {
+      await repo.deleteBrand(id);
+      await reload();
+      unawaited(ref.read(adminProductsProvider.notifier).reload());
+    } catch (e) {
+      ref.read(adminErrorProvider.notifier).report(e);
+    }
+  }
+}
+
+final brandsProvider = NotifierProvider<BrandsNotifier, List<AdminBrand>>(
+  BrandsNotifier.new,
+);
 
 typedef TopProduct = ({String name, String? imageUrl, int qty, double revenue});
 

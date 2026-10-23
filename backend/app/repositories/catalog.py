@@ -10,20 +10,20 @@ MAX_RELATED = 12
 
 
 def _sellable():
-    return (Product.is_active, Product.stock > 0)
+    return (Product.listed, Product.stock > 0)
 
 
 class CatalogRepository(BaseRepository[Product]):
     model = Product
 
     async def get_active(self, product_id: int) -> Product | None:
-        return await self.session.scalar(select(Product).where(Product.id == product_id, Product.is_active))
+        return await self.session.scalar(select(Product).where(Product.id == product_id, Product.listed))
 
     async def get_with_relations(self, product_id: int) -> Product | None:
         """Товар + обе подборки за 3 запроса (основной + 2 selectin), без N+1."""
         stmt = (
             select(Product)
-            .where(Product.id == product_id, Product.is_active)
+            .where(Product.id == product_id, Product.listed)
             .options(selectinload(Product.cross_sell_products), selectinload(Product.upsell_products))
         )
         return (await self.session.scalars(stmt)).unique().one_or_none()
@@ -70,4 +70,4 @@ class CatalogRepository(BaseRepository[Product]):
 
 def visible_related(products: Sequence[Product]) -> list[Product]:
     """Фильтр для подборок карточки: не рекламируем то, что нельзя купить."""
-    return [p for p in products if p.is_active and p.stock > 0][:MAX_RELATED]
+    return [p for p in products if p.listed and p.stock > 0][:MAX_RELATED]

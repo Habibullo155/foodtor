@@ -251,8 +251,8 @@ async def my_purchases(user: CurrentUser, session: SessionDep):
                 times_bought=n,
                 total_quantity=int(qty or 0),
                 last_bought_at=last,
-                price=p.retail_price if p.is_active else None,
-                in_stock=p.is_active and p.stock > 0,
+                price=p.retail_price if p.listed else None,
+                in_stock=p.listed and p.stock > 0,
             )
         )
     return out

@@ -47,3 +47,4 @@ frontend/ios/Flutter/flutter_export_environment.sh
 .DS_Store
 *.log
 *.swp
+backend/.emoji-cache/

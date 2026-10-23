@@ -68,14 +68,16 @@ async def list_categories(session: SessionDep, response: Response) -> list[Categ
     counts = dict(
         (
             await session.execute(
-                select(Product.category_id, func.count()).where(Product.is_active).group_by(Product.category_id)
+                select(Product.category_id, func.count()).where(Product.listed).group_by(Product.category_id)
             )
         )
         .tuples()
         .all()
     )
     response.headers["Cache-Control"] = "public, max-age=300"
-    cats = (await session.scalars(select(Category).order_by(Category.position, Category.name))).all()
+    cats = (
+        await session.scalars(select(Category).where(Category.is_visible).order_by(Category.position, Category.name))
+    ).all()
     return [
         CategoryOut(
             id=c.id,
@@ -106,7 +108,7 @@ async def list_products(
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> ProductListOut:
     """Фильтр по цене — по розничной (оптовая зависит от количества и считается при выдаче)."""
-    conds = [Product.is_active]
+    conds = [Product.listed]
     if q:
         # ILIKE с bind-параметром; экранируем % и _ из пользовательского ввода
         pattern = "%" + q.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_") + "%"
@@ -191,7 +193,7 @@ async def prices(
     ids: Annotated[list[int], Query(min_length=1, max_length=200)],
 ) -> PricesOut:
     """Цены «для меня» по списку товаров: сайт отдаёт всем розничные страницы, а оптовику подставляет его цены."""
-    products = (await session.scalars(select(Product).where(Product.id.in_(ids), Product.is_active))).unique().all()
+    products = (await session.scalars(select(Product).where(Product.id.in_(ids), Product.listed))).unique().all()
     ctx, unit = await pricing.price_many(user, products)
     _cache_headers(response, personalized=True)
     return PricesOut(
