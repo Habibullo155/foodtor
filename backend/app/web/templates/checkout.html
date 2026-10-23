@@ -16,8 +16,8 @@
       <h2>Способ получения</h2>
       <div class="seg" role="radiogroup" data-delivery>
         <label><input type="radio" name="delivery" value="courier" checked><span>{{ icon('truck') }} Курьер</span></label>
-        <label><input type="radio" name="delivery" value="express"><span>{{ icon('bolt') }} За 2 часа</span></label>
-        <label><input type="radio" name="delivery" value="pickup"><span>{{ icon('store') }} Самовывоз</span></label>
+        {% if delivery.express_enabled %}<label><input type="radio" name="delivery" value="express"><span>{{ icon('bolt') }} За {{ delivery.express_hours }} ч</span></label>{% endif %}
+        {% if delivery.pickup_enabled %}<label><input type="radio" name="delivery" value="pickup"><span>{{ icon('store') }} Самовывоз</span></label>{% endif %}
       </div>
       <div data-address-block>
         <div class="addr-list" data-saved-addresses></div>
@@ -35,7 +35,8 @@
     <section class="panel">
       <h2>Оплата</h2>
       <div class="seg seg--col" role="radiogroup">
-        <label><input type="radio" name="payment" value="cash" checked><span>При получении — наличными или картой</span></label>
+        {% if online_payment %}<label><input type="radio" name="payment" value="card_online" checked><span>Картой онлайн</span></label>{% endif %}
+        <label><input type="radio" name="payment" value="cash" {{ 'checked' if not online_payment }}><span>При получении — наличными или картой</span></label>
       </div>
       <label class="field"><span>Комментарий к заказу</span><textarea class="input" name="note" rows="2" maxlength="1000" placeholder="Например: позвонить за 10 минут"></textarea></label>
     </section>

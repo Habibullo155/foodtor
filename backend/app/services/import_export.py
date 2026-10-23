@@ -1,45 +1,48 @@
 import asyncio
 import io
-from collections.abc import Iterable
+import secrets
 from enum import Enum
 from typing import Any
 
 import pandas as pd
 from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.product import ProductRepository
+from app.core.config import get_settings
+from app.models import Category, Product, ProductImage
 from app.schemas.product import ImportReport, ImportRowError, ProductImportRow
+from app.services import images
 
-BATCH_SIZE = 500
 MAX_ROWS = 50_000
-EXPORT_COLUMNS = [
-    "sku",
-    "name",
-    "description",
-    "cost_price",
-    "retail_price",
-    "compare_at_price",
-    "wholesale_price",
-    "stock",
-    "is_active",
-    "category_id",
-]
-REQUIRED_COLUMNS = {"sku", "name", "cost_price", "retail_price"}
+MAX_DOWNLOADS = 300  # фото по чужим ссылкам за один файл — дольше запрос не держим
 
-# Синонимы заголовков — менеджеры часто присылают файлы с русскими колонками
-COLUMN_ALIASES = {
-    "артикул": "sku",
-    "название": "name",
-    "описание": "description",
-    "себестоимость": "cost_price",
-    "цена": "retail_price",
-    "старая цена": "compare_at_price",
-    "оптовая цена": "wholesale_price",
-    "опт": "wholesale_price",
-    "остаток": "stock",
-    "активен": "is_active",
-    "категория": "category_id",
+# Колонки выгрузки: заголовок в файле → поле. Тот же файл после правки загружается обратно
+EXPORT_COLUMNS = {
+    "Артикул": "sku",
+    "Название": "name",
+    "Фасовка": "unit",
+    "Категория": "category",
+    "Бренд": "brand",
+    "Себестоимость": "cost_price",
+    "Цена": "retail_price",
+    "Старая цена": "compare_at_price",
+    "Оптовая цена": "wholesale_price",
+    "Остаток": "stock",
+    "В продаже": "is_active",
+    "Фото": "image_url",
+    "Описание": "description",
 }
+COLUMN_ALIASES = {
+    **{k.lower(): v for k, v in EXPORT_COLUMNS.items()},
+    **{v: v for v in EXPORT_COLUMNS.values()},
+    "вес": "unit",
+    "опт": "wholesale_price",
+    "активен": "is_active",
+    "ссылка на фото": "image_url",
+    "фото (ссылка)": "image_url",
+}
+REQUIRED_COLUMNS = {"name", "retail_price"}
 
 
 class FileFormat(str, Enum):
@@ -59,13 +62,13 @@ def detect_format(filename: str, head: bytes) -> FileFormat:
     name = filename.lower()
     if name.endswith(".xlsx"):
         if not head.startswith(_XLSX_MAGIC):
-            raise ImportFileError("File is not a valid .xlsx archive")
+            raise ImportFileError("Файл не похож на настоящий .xlsx")
         return FileFormat.XLSX
     if name.endswith(".csv"):
         if b"\x00" in head:
-            raise ImportFileError("CSV contains binary data")
+            raise ImportFileError("В CSV-файле двоичные данные")
         return FileFormat.CSV
-    raise ImportFileError("Only .xlsx and .csv are supported")
+    raise ImportFileError("Поддерживаются только .xlsx и .csv")
 
 
 def _read_dataframe(content: bytes, fmt: FileFormat) -> pd.DataFrame:
@@ -77,64 +80,150 @@ def _read_dataframe(content: bytes, fmt: FileFormat) -> pd.DataFrame:
     else:
         df = pd.read_csv(buf, dtype=str, sep=None, engine="python", encoding="utf-8-sig", nrows=MAX_ROWS + 1)
     if len(df) > MAX_ROWS:
-        raise ImportFileError(f"Too many rows (max {MAX_ROWS})")
+        raise ImportFileError(f"Слишком много строк (максимум {MAX_ROWS})")
     df.columns = [COLUMN_ALIASES.get(str(c).strip().lower(), str(c).strip().lower()) for c in df.columns]
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
-        raise ImportFileError(f"Missing required columns: {', '.join(sorted(missing))}")
+        names = {v: k for k, v in EXPORT_COLUMNS.items()}
+        raise ImportFileError("В файле нет колонок: " + ", ".join(names[m] for m in sorted(missing)))
     df = df.dropna(how="all")
     return df.astype(object).where(df.notna(), None)
 
 
 def _fmt_errors(exc: ValidationError) -> list[str]:
-    return [f"{'.'.join(map(str, e['loc'])) or 'row'}: {e['msg']}" for e in exc.errors()]
+    names = {v: k for k, v in EXPORT_COLUMNS.items()}
+    out = []
+    for e in exc.errors():
+        field = names.get(str(e["loc"][0]), "") if e["loc"] else ""
+        msg = e["msg"].removeprefix("Value error, ")
+        out.append(f"{field}: {msg}" if field else msg)
+    return out
 
 
-def _chunks(items: list[dict[str, Any]], size: int) -> Iterable[list[dict[str, Any]]]:
-    for i in range(0, len(items), size):
-        yield items[i : i + size]
+def _key(name: str, unit: str | None) -> tuple[str, str]:
+    return " ".join(name.lower().split()), " ".join((unit or "").lower().split())
+
+
+def _new_sku(taken: set[str]) -> str:
+    while (sku := f"FT-{secrets.token_hex(3).upper()}") in taken:
+        pass
+    taken.add(sku)
+    return sku
 
 
 class ProductImportService:
-    def __init__(self, products: ProductRepository) -> None:
-        self.products = products
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def _category(self, name: str, cache: dict[str, Category], dry_run: bool) -> Category | None:
+        from app.web.catalog import slugify
+
+        key = name.strip().lower()
+        if key in cache:
+            return cache[key]
+        if dry_run:
+            return None
+        slug, n = slugify(name), 1
+        while await self.session.scalar(select(Category.id).where(Category.slug == slug)):
+            n += 1
+            slug = f"{slugify(name)}-{n}"
+        cat = Category(name=name.strip(), slug=slug)
+        self.session.add(cat)
+        await self.session.flush()
+        cache[key] = cat
+        return cat
 
     async def import_file(self, filename: str, content: bytes, *, dry_run: bool = False) -> ImportReport:
         fmt = detect_format(filename, content[:8])
         df = await asyncio.to_thread(_read_dataframe, content, fmt)
+        present = set(df.columns)
 
-        valid: dict[str, dict[str, Any]] = {}
+        products = list((await self.session.scalars(select(Product))).unique().all())
+        by_sku = {p.sku: p for p in products}
+        by_key = {_key(p.name, p.unit): p for p in products}
+        categories = {c.name.lower(): c for c in (await self.session.scalars(select(Category))).all()}
+        taken_skus = set(by_sku)
+
         errors: list[ImportRowError] = []
         warnings: list[str] = []
+        created = updated = downloaded = 0
+        seen: set[int] = set()
 
         for idx, raw in enumerate(df.to_dict(orient="records")):
             file_row = idx + 2  # +1 заголовок, +1 нумерация с единицы
             try:
                 row = ProductImportRow.model_validate(raw)
             except ValidationError as exc:
-                errors.append(ImportRowError(row=file_row, sku=raw.get("sku"), errors=_fmt_errors(exc)))
+                errors.append(
+                    ImportRowError(row=file_row, sku=raw.get("sku"), name=raw.get("name"), errors=_fmt_errors(exc))
+                )
                 continue
-            if row.sku in valid:
-                warnings.append(f"Row {file_row}: duplicate SKU {row.sku}, last occurrence wins")
-            if row.retail_price < row.cost_price:
-                warnings.append(f"Row {file_row}: SKU {row.sku} is sold below cost")
-            data = row.model_dump()
-            if "wholesale_price" not in df.columns:
-                data.pop("wholesale_price")  # файл без колонки опта не стирает уже заданные оптовые цены
-            valid[row.sku] = data
 
-        created = updated = 0
-        if not dry_run and valid:
-            # Все батчи в одной транзакции запроса: либо весь файл, либо ничего
-            for batch in _chunks(list(valid.values()), BATCH_SIZE):
-                c, u = await self.products.bulk_upsert(batch)
-                created += c
-                updated += u
+            product = (by_sku.get(row.sku) if row.sku else None) or by_key.get(_key(row.name, row.unit))
+            if product is not None and id(product) in seen:
+                warnings.append(f"Строка {file_row}: «{row.name}» уже был выше в файле — применена последняя строка")
+            cost = row.cost_price if row.cost_price is not None else (product.cost_price if product else None)
+            if cost is not None and row.retail_price < cost:
+                warnings.append(f"Строка {file_row}: «{row.name}» продаётся дешевле себестоимости")
+
+            if product is None:
+                if row.cost_price is None:
+                    warnings.append(f"Строка {file_row}: у нового товара «{row.name}» нет себестоимости — записан 0")
+                created += 1
+                if dry_run:
+                    continue
+                sku = row.sku if row.sku and row.sku not in taken_skus else _new_sku(taken_skus)
+                taken_skus.add(sku)
+                product = Product(
+                    sku=sku,
+                    name=row.name,
+                    unit=row.unit,
+                    cost_price=row.cost_price or 0,
+                    retail_price=row.retail_price,
+                    stock=0,
+                    description="",
+                )
+                self.session.add(product)
+                by_key[_key(row.name, row.unit)] = product
+            else:
+                updated += 1
+                if dry_run:
+                    continue
+            seen.add(id(product))
+
+            product.retail_price = row.retail_price
+            if row.cost_price is not None:
+                product.cost_price = row.cost_price
+            if "compare_at_price" in present:
+                product.compare_at_price = row.compare_at_price
+            if "wholesale_price" in present:
+                product.wholesale_price = row.wholesale_price  # пустая ячейка — оптовой цены нет
+            for field in ("stock", "is_active", "brand", "description"):
+                if (value := getattr(row, field)) is not None:
+                    setattr(product, field, value)
+            if row.category:
+                product.category = await self._category(row.category, categories, dry_run)
+
+            if row.image_url and not images.is_own(row.image_url):
+                if downloaded >= MAX_DOWNLOADS:
+                    warnings.append(f"Строка {file_row}: фото не скачано — за раз не больше {MAX_DOWNLOADS} фото")
+                    continue
+                try:
+                    url, _, _ = images.store(await images.download(row.image_url), "products")
+                except (images.ImageError, OSError) as exc:
+                    warnings.append(f"Строка {file_row}: фото «{row.name}» не загружено — {exc}")
+                    continue
+                product.images = [ProductImage(url=url, position=0)]
+                downloaded += 1
+
+        if not dry_run:
+            await self.session.flush()
 
         return ImportReport(
             total_rows=len(df),
             created=created,
             updated=updated,
+            images_downloaded=downloaded,
             failed=len(errors),
             dry_run=dry_run,
             errors=errors[:500],
@@ -142,7 +231,28 @@ class ProductImportService:
         )
 
     async def export(self, fmt: FileFormat) -> bytes:
-        records = [{col: getattr(p, col) for col in EXPORT_COLUMNS} async for p in self.products.stream_all()]
+        base = get_settings().public_shop_url.rstrip("/")
+        rows = (await self.session.scalars(select(Product).order_by(Product.name))).unique().all()
+        records = []
+        for p in rows:
+            image = p.images[0].url if p.images else None
+            records.append(
+                {
+                    "Артикул": p.sku,
+                    "Название": p.name,
+                    "Фасовка": p.unit,
+                    "Категория": p.category.name if p.category else None,
+                    "Бренд": p.brand,
+                    "Себестоимость": float(p.cost_price),
+                    "Цена": float(p.retail_price),
+                    "Старая цена": float(p.compare_at_price) if p.compare_at_price is not None else None,
+                    "Оптовая цена": float(p.wholesale_price) if p.wholesale_price is not None else None,
+                    "Остаток": p.stock,
+                    "В продаже": "да" if p.is_active else "нет",
+                    "Фото": f"{base}{image}" if image and image.startswith("/") else image,
+                    "Описание": p.description,
+                }
+            )
         return await asyncio.to_thread(_write_dataframe, records, fmt)
 
 
@@ -154,14 +264,15 @@ def _neutralize_formula(v):
 
 
 def _write_dataframe(records: list[dict[str, Any]], fmt: FileFormat) -> bytes:
-    df = pd.DataFrame.from_records(records, columns=EXPORT_COLUMNS)
-    # Защита от CSV/Formula injection: ячейка, начинающаяся с = + - @, исполнится в Excel
-    for col in ("sku", "name", "description"):
-        df[col] = df[col].map(lambda v: f"'{v}" if isinstance(v, str) and v[:1] in "=+-@\t\r" else v)
+    df = pd.DataFrame.from_records(records, columns=list(EXPORT_COLUMNS)).map(_neutralize_formula)
     buf = io.BytesIO()
     if fmt is FileFormat.XLSX:
-        df = df.map(_neutralize_formula)
-        df.to_excel(buf, index=False, engine="openpyxl", sheet_name="products")
+        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Товары")
+            sheet = writer.sheets["Товары"]
+            for col, width in zip("ABCDEFGHIJKLM", (12, 36, 10, 20, 18, 14, 10, 12, 13, 10, 10, 50, 40), strict=True):
+                sheet.column_dimensions[col].width = width
+            sheet.freeze_panes = "A2"
     else:
-        df.map(_neutralize_formula).to_csv(buf, index=False, encoding="utf-8-sig")
+        df.to_csv(buf, index=False, encoding="utf-8-sig")
     return buf.getvalue()

@@ -9,6 +9,7 @@ import re
 EXACT = {
     "Address not found": "Адрес не найден",
     "Price list not found": "Прайс-лист не найден",
+    "Invalid payment method": "Выберите способ оплаты",
     "B2B account not found": "Оптовый аккаунт не найден",
     "Category not found": "Категория не найдена",
     "Email is already registered": "Этот email уже зарегистрирован",
@@ -18,8 +19,6 @@ EXACT = {
     "Invalid email or password": "Неверный email или пароль",
     "Invalid refresh token": "Сессия истекла — войдите снова",
     "No available products": "Товаров нет в наличии",
-    "Online payment is not available yet": "Онлайн-оплата пока недоступна — выберите оплату при получении",
-    "Online payments are not configured": "Онлайн-оплата пока недоступна — выберите оплату при получении",
     "Order does not need payment": "Этот заказ не нужно оплачивать онлайн",
     "Order is already paid": "Заказ уже оплачен",
     "Order is closed": "Заказ уже закрыт",

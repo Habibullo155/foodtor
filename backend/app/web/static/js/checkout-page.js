@@ -20,6 +20,8 @@ form.phone.value = user.phone || '';
 attachPhoneMask(form.phone);
 const kind = () => form.querySelector('[name=delivery]:checked').value;
 $$('[name=delivery]', form).forEach((r) => { r.checked = r.value === (prefs.delivery || 'courier'); });
+if (!form.querySelector('[name=delivery]:checked')) form.querySelector('[name=delivery][value=courier]').checked = true;
+let deliveryIssue = null;
 
 function fullAddress() {
   if (kind() === 'pickup') return 'Самовывоз';
@@ -156,6 +158,11 @@ async function renderSummary() {
       row(DELIVERY[kind()].label, +q.delivery_fee ? rub(q.delivery_fee) : 'бесплатно', +q.delivery_fee ? '' : 'good') +
       row('К оплате', rub(q.total), 'total');
     if (q.promo_error) toast(q.promo_error);
+    deliveryIssue = q.wholesale && +q.subtotal < +q.wholesale_min_order
+      ? `Минимальный заказ для оптовых клиентов — ${rub(q.wholesale_min_order)}`
+      : q.delivery_problem;
+    showError(deliveryIssue);
+    updateSubmit();
   } catch (e) { showError(e.message); }
 }
 
@@ -165,7 +172,7 @@ function showError(msg) {
   el.hidden = !msg;
 }
 
-function blocked() { return kind() !== 'pickup' && zone && !zone.ok; }
+function blocked() { return Boolean(deliveryIssue) || (kind() !== 'pickup' && zone && !zone.ok); }
 function updateSubmit() {
   $('[data-submit]', form).disabled = blocked();
 }
@@ -175,13 +182,14 @@ form.addEventListener('submit', async (e) => {
   showError('');
   if (form.name.value.trim().length < 2) return showError('Укажите имя получателя');
   if (!phoneComplete(form.phone.value)) return showError('Введите телефон полностью: +7 (9XX) XXX-XX-XX');
+  if (deliveryIssue) return showError(deliveryIssue);
   if (kind() !== 'pickup') {
     if (savedId == null && !point) {
       const problem = addressProblem(form.address.value, cities);
       if (problem) return showError(problem);
     }
     await checkZone(true);
-    if (blocked()) return showError(zone.reason || 'Мы не доставляем по этому адресу');
+    if (blocked()) return showError(deliveryIssue || zone?.reason || 'Мы не доставляем по этому адресу');
   }
   const btn = $('[data-submit]', form);
   btn.disabled = true;

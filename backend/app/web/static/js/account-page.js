@@ -4,6 +4,10 @@ import { addressProblem, pickLocation } from './map-picker.js';
 import { attachPhoneMask, formatPhone, phoneComplete, phoneDigits } from './phone.js';
 
 let user = await requireLogin();
+api('/me/support/unread').then(({ unread }) => {
+  const badge = $('[data-support-unread]');
+  if (badge && unread) { badge.textContent = unread; badge.hidden = false; }
+}).catch(() => {});
 const main = $('[data-section]');
 let poll = null;
 

@@ -2,8 +2,16 @@
 {% from "_macros.html" import icon %}
 {% block content %}
 <nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<span>{{ heading }}</span></nav>
-<article class="prose">
-  <h1>{{ heading }}</h1>
-  {% block body %}{% endblock %}
-</article>
+<div class="info">
+  <aside class="info__nav" aria-label="Информация">
+    {% for slug, label in [('about', 'О нас'), ('delivery', 'Доставка'), ('payment', 'Оплата'), ('returns', 'Возврат и обмен'), ('contacts', 'Контакты'), ('offer', 'Публичная оферта'), ('privacy', 'Политика конфиденциальности')] %}
+    <a href="/info/{{ slug }}" class="{{ 'is-active' if request.url.path == '/info/' ~ slug }}">{{ label }}</a>
+    {% endfor %}
+    <a href="/support" class="info__support">{{ icon('headset') }} Поддержка</a>
+  </aside>
+  <article class="prose">
+    <h1>{{ heading }}</h1>
+    {% block body %}{% endblock %}
+  </article>
+</div>
 {% endblock %}

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse, RedirectResponse
 from sqlalchemy import select
 
@@ -11,7 +11,14 @@ from app.core.config import get_settings
 from app.models import Order, PaymentStatus
 from app.services.payments import AlfaClient, PaymentError, sync_payment
 
-router = APIRouter(prefix="/payments/alfa", tags=["payments"])
+
+def _enabled() -> None:
+    # пока эквайринг не подключён, этих адресов «не существует»
+    if not get_settings().payments_enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
+
+
+router = APIRouter(prefix="/payments/alfa", tags=["payments"], dependencies=[Depends(_enabled)])
 
 
 async def _sync(session, bank_order_id: str) -> Order:

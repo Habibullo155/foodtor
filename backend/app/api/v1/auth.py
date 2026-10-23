@@ -22,6 +22,7 @@ from app.core.security import (
 )
 from app.models import RefreshToken, SystemRole, User
 from app.repositories.loyalty import UserRepository
+from app.services import referrals
 from app.services.bootstrap import ensure_system_roles
 from app.services.login_codes import Channel, CodeError, check_code, email_configured, issue_code, normalize_phone
 
@@ -129,6 +130,7 @@ class RegisterIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=2, max_length=200)
     phone: str | None = Field(default=None, pattern=r"^\+?[0-9 ()\-]{7,20}$")
+    ref: str | None = Field(default=None, max_length=16)  # код пригласившего друга
 
     @model_validator(mode="after")
     def _strength(self):
@@ -153,6 +155,7 @@ async def register(request: Request, session: SessionDep, body: RegisterIn) -> T
     )
     session.add(user)
     await session.flush()
+    await referrals.attach_referrer(session, user, body.ref)
     await session.refresh(user, ["role"])
     return await _issue_pair(session, user, request)
 
@@ -284,6 +287,7 @@ async def _verify(request: Request, session, channel: Channel, target: str, code
 class CompleteIn(BaseModel):
     signup_token: str
     full_name: str = Field(min_length=2, max_length=200)
+    ref: str | None = Field(default=None, max_length=16)
 
 
 async def _complete(request: Request, session, body: CompleteIn) -> TokenPair:
@@ -318,6 +322,7 @@ async def _complete(request: Request, session, body: CompleteIn) -> TokenPair:
         )
         session.add(user)
         await session.flush()
+        await referrals.attach_referrer(session, user, body.ref)
         await session.refresh(user, ["role"])
     return await _issue_pair(session, user, request)
 

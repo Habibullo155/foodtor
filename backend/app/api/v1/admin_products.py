@@ -37,7 +37,7 @@ async def import_products(
     request: Request,  # нужен slowapi
     service: ImportService,
     _: Annotated[User, Depends(require(Permission.PRODUCTS_IMPORT))],
-    file: Annotated[UploadFile, File(description=".xlsx или .csv; ключ сопоставления — sku")],
+    file: Annotated[UploadFile, File(description=".xlsx или .csv; товар ищется по артикулу, иначе по названию и фасовке")],
     dry_run: Annotated[bool, Query(description="Только валидация, без записи в БД")] = False,
 ) -> ImportReport:
     content = await _read_limited(file, get_settings().max_import_file_mb * 2**20)

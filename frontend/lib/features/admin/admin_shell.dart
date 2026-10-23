@@ -6,6 +6,8 @@ import 'auth/admin_auth.dart';
 import 'auth/login_screen.dart';
 import 'data/admin_data.dart';
 import 'pages/business_page.dart';
+import 'pages/marketing_page.dart';
+import 'pages/support_page.dart';
 import 'pages/catalog_pages.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/orders_page.dart';
@@ -14,6 +16,7 @@ import 'pages/delivery_page.dart';
 import 'pages/picking_page.dart';
 import 'pages/stories_page.dart';
 import 'rbac.dart';
+import 'widgets/profile_dialog.dart';
 import '../../core/theme/theme_mode.dart';
 
 class AdminRoot extends ConsumerWidget {
@@ -34,11 +37,19 @@ class AdminRoot extends ConsumerWidget {
 
 const _groups = <(String, List<AdminSection>)>[
   ('Обзор', [AdminSection.dashboard]),
-  ('Продажи', [AdminSection.orders, AdminSection.picking]),
+  (
+    'Продажи',
+    [AdminSection.orders, AdminSection.picking, AdminSection.support],
+  ),
   ('Доставка', [AdminSection.delivery, AdminSection.courier]),
   (
     'Каталог',
-    [AdminSection.products, AdminSection.reviews, AdminSection.stories],
+    [
+      AdminSection.products,
+      AdminSection.reviews,
+      AdminSection.stories,
+      AdminSection.marketing,
+    ],
   ),
   (
     'Клиенты и команда',
@@ -55,6 +66,8 @@ const _subtitles = {
   AdminSection.reviews: 'Модерация отзывов покупателей',
   AdminSection.stories: '«Кружочки» на главной сайта: акции, новинки, рецепты',
   AdminSection.business: 'Заявки компаний и минимальный оптовый заказ',
+  AdminSection.marketing: 'Баннеры на главной и программа «Приведи друга»',
+  AdminSection.support: 'Сообщения покупателей со страницы «Поддержка»',
   AdminSection.loyalty: 'Уровни и скидки программы лояльности',
   AdminSection.staff: 'Сотрудники и их роли',
   AdminSection.delivery: 'Часы работы, соцсети, радиус и города доставки',
@@ -111,6 +124,8 @@ class _AdminShellState extends ConsumerState<AdminShell> {
           AdminSection.staff => const StaffPage(),
           AdminSection.delivery => const DeliverySettingsPage(),
           AdminSection.business => const BusinessPage(),
+          AdminSection.marketing => const MarketingPage(),
+          AdminSection.support => const SupportPage(),
         },
       ),
     );
@@ -203,10 +218,14 @@ class _Sidebar extends ConsumerWidget {
         (r) => r.where((x) => x.state == ReviewState.pending).length,
       ),
     );
+    final supportUnread = sections.contains(AdminSection.support)
+        ? ref.watch(supportUnreadProvider)
+        : 0;
     final badges = {
       AdminSection.orders: newOrders,
       AdminSection.picking: newOrders,
       AdminSection.reviews: pendingReviews,
+      AdminSection.support: supportUnread,
     };
 
     return Material(
@@ -376,23 +395,27 @@ class _UserCard extends ConsumerWidget {
           ),
           const SizedBox(width: Insets.md),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  s.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  s.roleTitle,
-                  style: TextStyle(
-                    color: context.palette.textSecondary,
-                    fontSize: 12,
+            child: InkWell(
+              onTap: () => showProfileDialog(context),
+              borderRadius: BorderRadius.circular(Radii.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-                ),
-              ],
+                  Text(
+                    s.roleTitle,
+                    style: TextStyle(
+                      color: context.palette.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -495,7 +518,9 @@ class _TopBar extends ConsumerWidget {
             PopupMenuButton<String>(
               tooltip: session.name,
               offset: const Offset(0, 48),
-              onSelected: (_) => ref.read(adminAuthProvider.notifier).logout(),
+              onSelected: (v) => v == 'profile'
+                  ? showProfileDialog(context)
+                  : ref.read(adminAuthProvider.notifier).logout(),
               itemBuilder: (_) => [
                 PopupMenuItem(
                   enabled: false,
@@ -505,6 +530,16 @@ class _TopBar extends ConsumerWidget {
                   ),
                 ),
                 const PopupMenuDivider(),
+                const PopupMenuItem(
+                  value: 'profile',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded, size: 18),
+                      SizedBox(width: 8),
+                      Text('Мой профиль'),
+                    ],
+                  ),
+                ),
                 const PopupMenuItem(
                   value: 'logout',
                   child: Row(

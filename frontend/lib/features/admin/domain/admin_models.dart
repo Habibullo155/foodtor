@@ -229,12 +229,26 @@ class FinanceData {
 
 @immutable
 class AdminCategory {
-  const AdminCategory(this.id, this.name, [String? slug]) : _slug = slug;
+  const AdminCategory(this.id, this.name, [String? slug, this.imageUrl])
+    : _slug = slug;
   final int id;
   final String name;
   final String? _slug;
+  final String? imageUrl;
 
-  String get url => '/catalog/${_slug ?? slugify(name)}';
+  String get slug => _slug ?? slugify(name);
+  String get url => '/catalog/$slug';
+
+  AdminCategory copyWith({
+    String? name,
+    String? imageUrl,
+    bool clearImage = false,
+  }) => AdminCategory(
+    id,
+    name ?? this.name,
+    _slug,
+    clearImage ? null : (imageUrl ?? this.imageUrl),
+  );
 }
 
 const _tr = {
@@ -835,5 +849,263 @@ class AdminStory {
       for (final s in (j['slides'] as List).cast<Map<String, dynamic>>())
         StorySlideData.fromJson(s),
     ],
+  );
+}
+
+double _money(Object? v) => v is num ? v.toDouble() : double.parse(v as String);
+
+/// Контакты, условия доставки и реквизиты — всё, что видно покупателю на сайте.
+@immutable
+class ShopSettings {
+  const ShopSettings({
+    this.phone = '+7 (985) 394-72-62',
+    this.email = '',
+    this.minOrder = 2500,
+    this.courierFee = 199,
+    this.freeFrom = 5000,
+    this.expressEnabled = true,
+    this.expressFee = 349,
+    this.expressHours = 2,
+    this.pickupEnabled = true,
+    this.legalName = '',
+    this.legalInn = '',
+    this.legalOgrn = '',
+    this.legalAddress = '',
+  });
+
+  final String phone;
+  final String email;
+  final double minOrder;
+  final double courierFee;
+  final double? freeFrom; // null — курьер всегда платный, 0 — всегда бесплатный
+  final bool expressEnabled;
+  final double expressFee;
+  final int expressHours;
+  final bool pickupEnabled;
+  final String legalName;
+  final String legalInn;
+  final String legalOgrn;
+  final String legalAddress;
+
+  factory ShopSettings.fromJson(Map<String, dynamic> j) => ShopSettings(
+    phone: j['contact_phone'] as String,
+    email: j['contact_email'] as String? ?? '',
+    minOrder: _money(j['delivery_min_order']),
+    courierFee: _money(j['courier_fee']),
+    freeFrom: j['free_delivery_from'] == null
+        ? null
+        : _money(j['free_delivery_from']),
+    expressEnabled: j['express_enabled'] as bool,
+    expressFee: _money(j['express_fee']),
+    expressHours: j['express_hours'] as int,
+    pickupEnabled: j['pickup_enabled'] as bool,
+    legalName: j['legal_name'] as String? ?? '',
+    legalInn: j['legal_inn'] as String? ?? '',
+    legalOgrn: j['legal_ogrn'] as String? ?? '',
+    legalAddress: j['legal_address'] as String? ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {
+    'contact_phone': phone,
+    'contact_email': email,
+    'delivery_min_order': minOrder.toStringAsFixed(2),
+    'courier_fee': courierFee.toStringAsFixed(2),
+    'free_delivery_from': freeFrom?.toStringAsFixed(2),
+    'express_enabled': expressEnabled,
+    'express_fee': expressFee.toStringAsFixed(2),
+    'express_hours': expressHours,
+    'pickup_enabled': pickupEnabled,
+    'legal_name': legalName,
+    'legal_inn': legalInn,
+    'legal_ogrn': legalOgrn,
+    'legal_address': legalAddress,
+  };
+}
+
+@immutable
+class ReferralSettings {
+  const ReferralSettings({
+    this.enabled = true,
+    this.friendAmount = 300,
+    this.inviterAmount = 300,
+    this.minOrder = 2500,
+  });
+  final bool enabled;
+  final double friendAmount;
+  final double inviterAmount;
+  final double minOrder;
+
+  factory ReferralSettings.fromJson(Map<String, dynamic> j) => ReferralSettings(
+    enabled: j['referral_enabled'] as bool,
+    friendAmount: _money(j['referral_friend_amount']),
+    inviterAmount: _money(j['referral_inviter_amount']),
+    minOrder: _money(j['referral_min_order']),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'referral_enabled': enabled,
+    'referral_friend_amount': friendAmount.toStringAsFixed(2),
+    'referral_inviter_amount': inviterAmount.toStringAsFixed(2),
+    'referral_min_order': minOrder.toStringAsFixed(2),
+  };
+}
+
+enum BannerTheme {
+  green('Зелёный', Color(0xFF0B5D3B), Colors.white),
+  orange('Оранжевый', Color(0xFFFB8C00), Color(0xFF1F2A1F)),
+  cream('Светлый', Color(0xFFF1EDE3), Color(0xFF17291F));
+
+  const BannerTheme(this.label, this.background, this.foreground);
+  final String label;
+  final Color background;
+  final Color foreground;
+}
+
+/// Баннер-слайд на главной сайта.
+@immutable
+class AdminBanner {
+  const AdminBanner({
+    this.id = 0,
+    required this.title,
+    this.text = '',
+    this.imageUrl,
+    this.buttonLabel,
+    this.linkUrl,
+    this.theme = BannerTheme.green,
+    this.isActive = true,
+    this.startsAt,
+    this.endsAt,
+  });
+
+  final int id;
+  final String title;
+  final String text;
+  final String? imageUrl;
+  final String? buttonLabel;
+  final String? linkUrl;
+  final BannerTheme theme;
+  final bool isActive;
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+
+  bool get visibleNow {
+    final now = DateTime.now();
+    return isActive &&
+        (startsAt == null || !startsAt!.isAfter(now)) &&
+        (endsAt == null || endsAt!.isAfter(now));
+  }
+
+  factory AdminBanner.fromJson(Map<String, dynamic> j) => AdminBanner(
+    id: j['id'] as int,
+    title: j['title'] as String,
+    text: j['text'] as String? ?? '',
+    imageUrl: j['image_url'] as String?,
+    buttonLabel: j['button_label'] as String?,
+    linkUrl: j['link_url'] as String?,
+    theme: BannerTheme.values.firstWhere(
+      (t) => t.name == j['theme'],
+      orElse: () => BannerTheme.green,
+    ),
+    isActive: j['is_active'] as bool? ?? true,
+    startsAt: j['starts_at'] == null
+        ? null
+        : DateTime.parse(j['starts_at'] as String).toLocal(),
+    endsAt: j['ends_at'] == null
+        ? null
+        : DateTime.parse(j['ends_at'] as String).toLocal(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'text': text,
+    'image_url': imageUrl,
+    'button_label': buttonLabel,
+    'link_url': linkUrl,
+    'theme': theme.name,
+    'is_active': isActive,
+    'starts_at': startsAt?.toUtc().toIso8601String(),
+    'ends_at': endsAt?.toUtc().toIso8601String(),
+  };
+
+  AdminBanner copyWith({int? id, bool? isActive}) => AdminBanner(
+    id: id ?? this.id,
+    title: title,
+    text: text,
+    imageUrl: imageUrl,
+    buttonLabel: buttonLabel,
+    linkUrl: linkUrl,
+    theme: theme,
+    isActive: isActive ?? this.isActive,
+    startsAt: startsAt,
+    endsAt: endsAt,
+  );
+}
+
+/// Диалог покупателя с поддержкой — строка во «Входящих».
+@immutable
+class SupportThread {
+  const SupportThread({
+    required this.userId,
+    required this.name,
+    required this.lastText,
+    required this.lastAt,
+    this.phone,
+    this.email,
+    this.lastFromStaff = false,
+    this.unread = 0,
+  });
+
+  final int userId;
+  final String name;
+  final String? phone;
+  final String? email;
+  final String lastText;
+  final DateTime lastAt;
+  final bool lastFromStaff;
+  final int unread;
+
+  factory SupportThread.fromJson(Map<String, dynamic> j) => SupportThread(
+    userId: j['user_id'] as int,
+    name: j['name'] as String,
+    phone: j['phone'] as String?,
+    email: j['email'] as String?,
+    lastText: j['last_text'] as String,
+    lastAt: DateTime.parse(j['last_at'] as String).toLocal(),
+    lastFromStaff: j['last_from_staff'] as bool? ?? false,
+    unread: j['unread'] as int? ?? 0,
+  );
+
+  SupportThread read() => SupportThread(
+    userId: userId,
+    name: name,
+    phone: phone,
+    email: email,
+    lastText: lastText,
+    lastAt: lastAt,
+    lastFromStaff: lastFromStaff,
+  );
+}
+
+@immutable
+class SupportMessage {
+  const SupportMessage({
+    required this.id,
+    required this.text,
+    required this.fromStaff,
+    required this.author,
+    required this.createdAt,
+  });
+  final int id;
+  final String text;
+  final bool fromStaff;
+  final String author;
+  final DateTime createdAt;
+
+  factory SupportMessage.fromJson(Map<String, dynamic> j) => SupportMessage(
+    id: j['id'] as int,
+    text: j['text'] as String,
+    fromStaff: j['from_staff'] as bool,
+    author: j['author'] as String,
+    createdAt: DateTime.parse(j['created_at'] as String).toLocal(),
   );
 }

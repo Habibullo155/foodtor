@@ -43,8 +43,7 @@ class ApiException implements Exception {
   static String _translate(String m) => switch (m) {
     'Invalid email or password' => 'Неверный email или пароль',
     'Email is already registered' => 'Этот email уже зарегистрирован',
-    'Online payment is not available yet' =>
-      'Онлайн-оплата пока недоступна, выберите оплату при получении',
+    'Invalid payment method' => 'Выберите способ оплаты',
     'Insufficient permissions' => 'Недостаточно прав',
     // ошибки валидации Pydantic: «Value error, Пароль слишком простой…»
     _ when m.startsWith('Value error, ') => m.substring('Value error, '.length),

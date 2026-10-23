@@ -475,3 +475,119 @@ dialog::backdrop { background: rgba(15, 23, 42, .5); }
 .socials .ic { width: 18px; height: 18px; }
 .footer__note { font-size: 12px; margin: 6px 0 0; }
 .btn.is-disabled { opacity: .5; cursor: not-allowed; }
+
+/* Информационные страницы */
+.info { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 32px; align-items: start; }
+.info__nav { position: sticky; top: 84px; display: flex; flex-direction: column; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.info__nav a { padding: 9px 12px; border-radius: var(--radius-sm); color: var(--text); font-size: 15px; }
+.info__nav a:hover { background: var(--muted-bg); }
+.info__nav a.is-active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+.info__support { display: flex; align-items: center; gap: 8px; margin-top: 6px; border-top: 1px solid var(--border); border-radius: 0 0 var(--radius-sm) var(--radius-sm) !important; color: var(--brand) !important; font-weight: 600; }
+.info__support .ic { width: 18px; height: 18px; }
+.prose { max-width: 780px; font-size: 16px; line-height: 1.65; }
+.prose h1 { font-size: clamp(26px, 3.4vw, 34px); margin: 0 0 16px; }
+.prose h2 { font-size: 21px; margin: 32px 0 10px; }
+.prose ol, .prose ul { padding-left: 22px; } .prose li { margin: 6px 0; }
+.lead { font-size: 18px; color: var(--text-2); margin: 0 0 24px; }
+.about-cards, .tariffs { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin: 8px 0 8px; }
+.about-cards > div, .tariff { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
+.about-cards b, .tariff b { display: block; font-size: 17px; margin-bottom: 4px; }
+.about-cards p, .tariff p { margin: 6px 0 0; color: var(--text-2); font-size: 14.5px; line-height: 1.5; }
+.tariff__price { display: inline-block; background: var(--brand-soft); color: var(--brand); font-weight: 800; border-radius: 999px; padding: 3px 12px; font-size: 15px; }
+.steps { counter-reset: step; list-style: none; padding: 0 !important; }
+.steps li { counter-increment: step; position: relative; padding-left: 44px; margin: 14px 0; }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: -2px; width: 30px; height: 30px; border-radius: 50%; background: var(--brand-deep); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+.requisites { display: grid; gap: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; margin: 8px 0; }
+.requisites div { display: grid; grid-template-columns: 140px 1fr; gap: 12px; padding: 10px 16px; }
+.requisites div + div { border-top: 1px solid var(--border); }
+.requisites dt { color: var(--text-2); } .requisites dd { margin: 0; font-weight: 600; }
+.contact-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 8px; }
+.contact-card { display: flex; flex-direction: column; gap: 4px; padding: 18px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.contact-card:hover { border-color: var(--brand); }
+.contact-card .ic { width: 26px; height: 26px; color: var(--brand); margin-bottom: 6px; }
+.contact-card span { color: var(--text-2); font-size: 14px; }
+
+/* Баннеры на главной */
+.banners { position: relative; margin: 0 0 16px; }
+.banners__track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; border-radius: 28px; }
+.banners__track::-webkit-scrollbar { display: none; }
+.banner { flex: 0 0 100%; scroll-snap-align: start; display: grid; grid-template-columns: 1fr; align-items: center; min-height: 220px; padding: 36px 40px; position: relative; overflow: hidden; }
+.banner--img { grid-template-columns: 1.1fr 1fr; }
+.banner--green { background: var(--brand-deep); color: #fff; }
+.banner--orange { background: linear-gradient(120deg, #FFA726, #FB8C00); color: #1F2A1F; }
+.banner--cream { background: #F1EDE3; color: #17291F; }
+.banner h2 { font-size: clamp(24px, 3.4vw, 38px); line-height: 1.1; margin: 0 0 10px; }
+.banner p { margin: 0 0 18px; font-size: 17px; opacity: .88; max-width: 520px; }
+.banner__img { width: 100%; max-height: 260px; object-fit: contain; }
+.btn--light { background: #fff; color: #17291F; }
+.banners__dots { position: absolute; bottom: 14px; left: 40px; display: flex; gap: 6px; }
+.banners__dots button { width: 9px; height: 9px; border-radius: 99px; border: 0; background: rgba(255,255,255,.45); padding: 0; cursor: pointer; transition: width .2s; }
+.banners__dots button.is-active { width: 26px; background: #fff; }
+.banner--cream ~ .banners__dots button, .banners__dots button { box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
+
+/* «Приведи друга» */
+.invite { display: flex; align-items: center; gap: 18px; margin: 16px 0 8px; padding: 18px 22px; border-radius: 22px; background: linear-gradient(110deg, var(--brand-soft), color-mix(in srgb, var(--cta) 16%, var(--surface))); color: var(--text); border: 1px solid var(--border); }
+.invite:hover { border-color: var(--cta); }
+.invite__icon { flex: none; width: 52px; height: 52px; border-radius: 16px; background: var(--cta); display: grid; place-items: center; }
+.invite__icon .ic { width: 28px; height: 28px; color: #1F2A1F; }
+.invite__text { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.invite__text b { font-size: 18px; } .invite__text span { color: var(--text-2); font-size: 14px; }
+.friends-hero { background: var(--brand-deep); color: #fff; border-radius: 28px; padding: 40px; margin-bottom: 18px; position: relative; overflow: hidden; }
+.friends-hero h1 { font-size: clamp(28px, 4vw, 42px); line-height: 1.1; margin: 12px 0; }
+.friends-hero p { max-width: 620px; color: rgba(255,255,255,.88); font-size: 17px; margin: 0; }
+.friends-hero__icon { display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 18px; background: var(--cta); }
+.friends-hero__icon .ic { width: 30px; height: 30px; color: #1F2A1F; }
+.friends-steps { list-style: none; padding: 0; margin: 0 0 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.friends-steps li { display: flex; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+.friends-steps b { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; }
+.friends-box h2 { font-size: 19px; margin: 0 0 10px; } .friends-box h2:not(:first-child) { margin-top: 22px; }
+.share { display: flex; gap: 8px; flex-wrap: wrap; } .share .input { flex: 1 1 260px; }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .04em; background: var(--muted-bg); padding: 2px 8px; border-radius: 6px; }
+.friends-stats { display: flex; gap: 14px; margin-top: 14px; }
+.friends-stats div { flex: 1; background: var(--muted-bg); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; }
+.friends-stats b { font-size: 24px; } .friends-stats span { color: var(--text-2); font-size: 13px; }
+.promo-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.promo-list li { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 12px; border: 1px dashed var(--brand); border-radius: var(--radius-sm); }
+.promo-list span { flex: 1; color: var(--text-2); font-size: 14px; }
+.friends-box__login { text-align: center; padding: 12px; }
+
+/* Поддержка */
+.support { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.support__chat { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.support__head { display: flex; gap: 12px; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.support__head h1 { font-size: 19px; margin: 0; } .support__head p { margin: 2px 0 0; }
+.support__avatar { width: 44px; height: 44px; border-radius: 14px; background: var(--brand-soft); display: grid; place-items: center; }
+.support__avatar .ic { width: 24px; height: 24px; color: var(--brand); }
+.support__body { min-height: 340px; max-height: 60vh; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.support__empty { margin: auto; text-align: center; max-width: 360px; }
+.support__chat .chat-form { display: flex; gap: 8px; align-items: flex-end; border-top: 1px solid var(--border); padding: 12px 16px; margin: 0; }
+.support__chat .chat-form textarea { resize: vertical; min-height: 44px; }
+.support__side h2 { font-size: 17px; margin: 0 0 10px; }
+.support__side a { display: inline-flex; align-items: center; gap: 8px; }
+.support__side .ic { width: 18px; height: 18px; }
+.support__side details { border-top: 1px solid var(--border); padding: 10px 0; }
+.support__side summary { cursor: pointer; font-weight: 600; }
+.support__side details p { margin: 8px 0 0; color: var(--text-2); font-size: 14px; }
+.bubble__who { display: block; font-size: 12px; opacity: .8; margin-bottom: 2px; }
+.bubble p { margin: 0; white-space: pre-wrap; }
+.bubble time { display: block; font-size: 11px; opacity: .7; margin-top: 4px; }
+.footer__support { margin: 10px 0 0; background: rgba(255,255,255,.12); color: #fff; display: inline-flex; gap: 6px; align-items: center; }
+.footer__support .ic { width: 16px; height: 16px; }
+.badge-count--inline { position: static; margin-left: 6px; }
+
+@media (max-width: 900px) {
+  .info { grid-template-columns: 1fr; gap: 16px; }
+  .info__nav { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; }
+  .info__nav a { white-space: nowrap; }
+  .info__support { border-top: 0; margin-top: 0; }
+  .support { grid-template-columns: 1fr; }
+  .banner--img { grid-template-columns: 1fr; }
+  .banner__img { max-height: 160px; order: -1; }
+  .friends-steps { grid-template-columns: 1fr; }
+}
+@media (max-width: 520px) {
+  .banner { padding: 24px 20px 40px; min-height: 0; } .banners__track { border-radius: 22px; } .banners__dots { left: 20px; }
+  .friends-hero { padding: 26px 20px; border-radius: 22px; }
+  .invite { flex-wrap: wrap; padding: 16px; } .invite__btn { width: 100%; }
+  .requisites div { grid-template-columns: 1fr; gap: 0; }
+}

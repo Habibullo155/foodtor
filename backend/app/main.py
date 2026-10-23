@@ -26,6 +26,7 @@ from app.api.v1 import (
     catalog,
     courier,
     delivery,
+    marketing,
     orders,
     payments,
     stories,
@@ -158,6 +159,7 @@ def create_app() -> FastAPI:
         admin_products.router,
         admin_merch.router,
         b2b.router,
+        marketing.router,
         stories.router,
     ):
         app.include_router(router, prefix="/api/v1")

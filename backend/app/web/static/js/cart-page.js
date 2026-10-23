@@ -1,4 +1,4 @@
-import { $, $$, api, cart, deliveryFee, DELIVERY, esc, FREE_FROM, icon, me, plural, rub } from './core.js';
+import { $, $$, api, cart, deliveryFee, deliveryProblem, DELIVERY, esc, FREE_FROM, icon, me, MIN_ORDER, plural, rub } from './core.js';
 import { cardHTML } from './cards.js';
 
 const page = $('[data-cart-page]');
@@ -44,7 +44,7 @@ function syncPrices(q) {
 function renderTotals() {
   const lines = cart.lines();
   const goods = lines.reduce((a, l) => a + l.qty * l.price, 0);
-  const kind = prefs.delivery || 'courier';
+  const kind = DELIVERY[prefs.delivery]?.on ? prefs.delivery : 'courier';
   const t = quote
     ? { subtotal: +quote.subtotal, loyalty: +quote.loyalty_discount, promo: +quote.promo_discount, fee: +quote.delivery_fee, total: +quote.total }
     : { subtotal: goods, loyalty: 0, promo: 0, fee: deliveryFee(kind, goods), total: goods + deliveryFee(kind, goods) };
@@ -60,20 +60,29 @@ function renderTotals() {
     row(DELIVERY[kind].label, t.fee ? rub(t.fee) : 'бесплатно', t.fee ? '' : 'good') +
     row('Итого', rub(t.total), 'total');
 
+  // Полоска: сначала до минимального заказа, потом — до бесплатной доставки
   const bar = $('[data-free-progress]', page);
-  bar.hidden = kind !== 'courier';
-  const left = Math.max(0, FREE_FROM - goods);
-  $('.progress__bar', bar).style.setProperty('--p', `${Math.min(100, (goods / FREE_FROM) * 100)}%`);
-  $('[data-free-text]', bar).textContent = left ? `Ещё ${rub(left)} — и курьерская доставка бесплатно` : 'Курьерская доставка — бесплатно';
+  const target = goods < MIN_ORDER ? MIN_ORDER : FREE_FROM;
+  bar.hidden = kind === 'pickup' || !target || (kind === 'express' && goods >= MIN_ORDER);
+  if (!bar.hidden) {
+    const left = Math.max(0, target - goods);
+    $('.progress__bar', bar).style.setProperty('--p', `${Math.min(100, (goods / target) * 100)}%`);
+    $('[data-free-text]', bar).textContent = goods < MIN_ORDER
+      ? `Ещё ${rub(left)} — и можно оформить доставку`
+      : left ? `Ещё ${rub(left)} — и курьерская доставка бесплатно` : 'Курьерская доставка — бесплатно';
+  }
 
   const min = quote?.wholesale ? Number(quote.wholesale_min_order) : 0;
   const short = Math.max(0, min - t.subtotal);
+  const problem = short
+    ? `Минимальный заказ для оптовых клиентов — ${rub(min)}. Добавьте ещё на ${rub(short)}`
+    : quote ? quote.delivery_problem : deliveryProblem(kind, goods);
   const minMsg = $('[data-min-order]', page);
-  minMsg.hidden = !short;
-  minMsg.textContent = short ? `Минимальный заказ для оптовых клиентов — ${rub(min)}. Добавьте ещё на ${rub(short)}` : '';
+  minMsg.hidden = !problem;
+  minMsg.textContent = problem || '';
   const btn = $('[data-checkout-btn]', page);
-  btn.classList.toggle('is-disabled', short > 0);
-  btn.setAttribute('aria-disabled', short > 0 ? 'true' : 'false');
+  btn.classList.toggle('is-disabled', Boolean(problem));
+  btn.setAttribute('aria-disabled', problem ? 'true' : 'false');
 
   const msg = $('[data-promo-msg]', page);
   msg.className = 'small';
@@ -127,7 +136,7 @@ page.addEventListener('click', (e) => {
 });
 
 $$('[data-delivery] input').forEach((r) => {
-  r.checked = r.value === (prefs.delivery || 'courier');
+  r.checked = r.value === (DELIVERY[prefs.delivery]?.on ? prefs.delivery : 'courier');
   r.addEventListener('change', () => { prefs.delivery = r.value; savePrefs(); render(); });
 });
 

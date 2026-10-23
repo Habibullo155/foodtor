@@ -106,10 +106,9 @@ async def test_rejected_company_can_apply_again(client, db):
 
 async def test_import_sets_wholesale_price_and_keeps_it_when_column_missing(db):
     from app.models import Product
-    from app.repositories.product import ProductRepository
     from app.services.import_export import ProductImportService
 
-    service = ProductImportService(ProductRepository(db))
+    service = ProductImportService(db)
     with_opt = "Артикул;Название;Себестоимость;Цена;Оптовая цена\nW-1;Мука;40;90;70\n"
     await service.import_file("p.csv", with_opt.encode())
     without = "Артикул;Название;Себестоимость;Цена\nW-1;Мука;40;95\n"

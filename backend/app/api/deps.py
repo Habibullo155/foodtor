@@ -11,7 +11,6 @@ from app.db.session import get_session
 from app.models import Permission, User
 from app.models.user import role_permissions
 from app.repositories.loyalty import LoyaltyTierRepository, UserRepository
-from app.repositories.product import ProductRepository
 from app.services.cart import CartService
 from app.services.import_export import ProductImportService
 from app.services.loyalty import LoyaltyService
@@ -86,7 +85,7 @@ def get_loyalty_service(session: SessionDep) -> LoyaltyService:
 
 
 def get_import_service(session: SessionDep) -> ProductImportService:
-    return ProductImportService(ProductRepository(session))
+    return ProductImportService(session)
 
 
 def get_pricing_service(session: SessionDep) -> PricingService:

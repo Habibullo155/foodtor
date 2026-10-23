@@ -26,11 +26,11 @@ async def test_export_has_no_live_formulas(client, db):
     owner = await staff(client, db, SystemRole.OWNER, "owner-exp@test.ru")
     r = await client.get("/api/v1/admin/products/export", params={"format": "csv"}, headers=owner)
     assert r.status_code == 200
-    names = pd.read_csv(io.BytesIO(r.content))["name"].tolist()
+    names = pd.read_csv(io.BytesIO(r.content))["Название"].tolist()
     assert names and all(not n.startswith("=") for n in names), names
     x = await client.get("/api/v1/admin/products/export", params={"format": "xlsx"}, headers=owner)
     assert x.status_code == 200
-    assert all(not n.startswith("=") for n in pd.read_excel(io.BytesIO(x.content))["name"])
+    assert all(not n.startswith("=") for n in pd.read_excel(io.BytesIO(x.content))["Название"])
 
 
 def _settings(**kw):

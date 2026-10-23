@@ -90,12 +90,8 @@ async def test_cash_order_becomes_paid_on_delivery_and_payment_status_visible(cl
     admin = (await client.get(f"/api/v1/admin/orders/{order['id']}", headers=owner)).json()
     assert (admin["payment_method"], admin["payment_status"]) == ("cash", "paid")
 
-    pay = (await client.get("/api/v1/admin/settings/payments", headers=owner)).json()
-    assert (
-        pay["provider"] == "Альфа-Банк"
-        and pay["mode"] == "off"
-        and pay["callback_url"].endswith("/payments/alfa/callback")
-    )
+    # пока эквайринг не подключён, о нём не знает никто — даже админка
+    assert (await client.get("/api/v1/admin/settings/payments", headers=owner)).status_code == 404
 
 
 async def test_check_by_map_point_and_reverse(client, db):

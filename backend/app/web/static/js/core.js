@@ -66,7 +66,6 @@ export class ApiError extends Error {
 const EN_RU = {
   'Invalid email or password': 'Неверный email или пароль',
   'Email is already registered': 'Этот email уже зарегистрирован',
-  'Online payment is not available yet': 'Онлайн-оплата пока недоступна — выберите оплату при получении',
   'Not authenticated': 'Войдите в аккаунт',
   'Order is closed': 'Заказ уже закрыт',
 };
@@ -154,6 +153,19 @@ export async function requireLogin() {
   return user;
 }
 
+// Код друга из ссылки ?ref=… — помним 30 дней, отправляем при регистрации
+const REF_KEY = 'ref_v1';
+const refParam = new URLSearchParams(location.search).get('ref');
+if (refParam && /^[A-Z0-9]{4,16}$/i.test(refParam)) {
+  try { localStorage.setItem(REF_KEY, JSON.stringify({ code: refParam.toUpperCase(), until: Date.now() + 30 * 864e5 })); } catch { /* приватный режим */ }
+}
+export function referralCode() {
+  try {
+    const r = JSON.parse(localStorage.getItem(REF_KEY));
+    return r && r.until > Date.now() ? r.code : null;
+  } catch { return null; }
+}
+
 // Хранится в браузере (работает и без входа). Цены — подсказка; итог всегда пересчитывает сервер.
 const CART_KEY = 'cart_v1';
 
@@ -188,10 +200,20 @@ export const cart = {
 // Корзина в другой вкладке изменилась — синхронизируемся
 window.addEventListener('storage', (e) => { if (e.key === CART_KEY) window.dispatchEvent(new CustomEvent('cart')); });
 
+const ds = document.body.dataset;
 export const DELIVERY = {
-  courier: { label: 'Курьер', fee: Number(document.body.dataset.courierFee) },
-  express: { label: 'Экспресс за 2 часа', fee: Number(document.body.dataset.expressFee) },
-  pickup: { label: 'Самовывоз', fee: 0 },
+  courier: { label: 'Курьер', fee: Number(ds.courierFee), on: true },
+  express: { label: ds.expressLabel, fee: Number(ds.expressFee), on: ds.expressOn === '1' },
+  pickup: { label: 'Самовывоз', fee: 0, on: ds.pickupOn === '1' },
 };
-export const FREE_FROM = Number(document.body.dataset.freeFrom);
-export const deliveryFee = (kind, goods) => (kind === 'pickup' ? 0 : (kind === 'courier' && goods >= FREE_FROM ? 0 : DELIVERY[kind].fee));
+export const MIN_ORDER = Number(ds.minOrder) || 0;
+export const FREE_FROM = ds.freeFrom === '' ? null : Number(ds.freeFrom); // null — курьер всегда платный
+export const deliveryFee = (kind, goods) => {
+  if (kind === 'pickup') return 0;
+  if (kind === 'courier' && FREE_FROM !== null && goods >= FREE_FROM) return 0;
+  return DELIVERY[kind].fee;
+};
+/** Почему с такой суммой этим способом не оформить (null — можно). Сервер проверяет то же самое. */
+export const deliveryProblem = (kind, goods) => (kind !== 'pickup' && goods < MIN_ORDER
+  ? `Доставка — при заказе от ${rub(MIN_ORDER)}. Добавьте товаров ещё на ${rub(MIN_ORDER - goods)}`
+  : null);

@@ -8,8 +8,8 @@
     <h2>Доставка</h2>
     <div class="seg" role="radiogroup" data-delivery>
       <label><input type="radio" name="delivery" value="courier" checked><span>{{ icon('truck') }} Курьер</span></label>
-      <label><input type="radio" name="delivery" value="express"><span>{{ icon('bolt') }} За 2 часа</span></label>
-      <label><input type="radio" name="delivery" value="pickup"><span>{{ icon('store') }} Самовывоз</span></label>
+      {% if delivery.express_enabled %}<label><input type="radio" name="delivery" value="express"><span>{{ icon('bolt') }} За {{ delivery.express_hours }} ч</span></label>{% endif %}
+      {% if delivery.pickup_enabled %}<label><input type="radio" name="delivery" value="pickup"><span>{{ icon('store') }} Самовывоз</span></label>{% endif %}
     </div>
     <div class="progress" data-free-progress><div class="progress__bar"></div><p class="small muted" data-free-text></p></div>
     <form class="promo" data-promo><input class="input" name="code" placeholder="Промокод" maxlength="32" autocomplete="off"><button class="btn btn--ghost" type="submit">Применить</button></form>

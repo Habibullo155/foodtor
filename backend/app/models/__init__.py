@@ -3,6 +3,7 @@
 from app.models.address import UserAddress
 from app.models.finance import Expense, ExpenseCategory
 from app.models.loyalty import DiscountType, LoyaltyTier
+from app.models.marketing import Banner, SupportMessage
 from app.models.order import (
     DeliveryMethod,
     Order,
@@ -33,6 +34,8 @@ from app.models.user import (
 )
 
 __all__ = [
+    "Banner",
+    "SupportMessage",
     "ShopSettings",
     "LoginCode",
     "Story",

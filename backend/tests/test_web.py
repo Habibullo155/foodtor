@@ -55,10 +55,10 @@ async def test_xss_in_product_name_is_escaped(client, db):
 
 async def test_service_pages_noindex_and_sitemap(client, db):
     veg, tomato = await _shop(db)
-    for path in ("/cart", "/checkout", "/login", "/account", "/info/about"):
+    for path in ("/cart", "/checkout", "/login", "/account"):
         r = await client.get(path)
         assert r.status_code == 200 and 'content="noindex, follow"' in r.text, path
-    for path in ("/info/delivery", "/info/offer", "/info/privacy", "/info/returns", "/info/contacts"):
+    for path in ("/info/about", "/info/delivery", "/info/offer", "/info/privacy", "/info/returns", "/info/contacts"):
         assert (await client.get(path)).status_code == 200, path
 
     robots = (await client.get("/robots.txt")).text
@@ -111,7 +111,7 @@ async def test_web_session_cookie(client, db):
 
 async def test_shop_options_public(client):
     r = (await client.get("/api/v1/shop/options")).json()
-    assert r["online_payment"] is False and r["free_courier_from"] == 1500
+    assert "online_payment" not in r and r["free_delivery_from"] == "1500.00" and r["min_order"] == "0.00"
 
 
 async def test_seo_details(client, db):

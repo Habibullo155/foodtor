@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<span>Приведи друга</span></nav>
+<section class="friends-hero">
+  <div>
+    <span class="friends-hero__icon">{{ icon('gift') }}</span>
+    <h1>Приведите друга —<br>{% if referral.inviter_amount > 0 %}получите {{ referral.inviter_amount|rub }}{% else %}порадуйте его скидкой{% endif %}</h1>
+    <p>Поделитесь своей ссылкой.{% if referral.friend_amount > 0 %} Друг получит промокод на {{ referral.friend_amount|rub }} на первый заказ,{% endif %}{% if referral.inviter_amount > 0 %} а вы — промокод на {{ referral.inviter_amount|rub }}, как только друг получит свой первый заказ.{% endif %}</p>
+  </div>
+</section>
+<ol class="friends-steps">
+  <li><b>1</b><span>Отправьте другу свою ссылку</span></li>
+  <li><b>2</b><span>Друг регистрируется по ней{% if referral.friend_amount > 0 %} и получает {{ referral.friend_amount|rub }}{% endif %}</span></li>
+  <li><b>3</b><span>Друг получает первый заказ{% if referral.inviter_amount > 0 %} — вам приходит {{ referral.inviter_amount|rub }}{% endif %}</span></li>
+</ol>
+<section class="panel friends-box" data-friends><div class="skeleton"></div></section>
+<p class="muted small">Промокоды действуют на заказ от {{ referral.min_order|rub }}, используются один раз и не суммируются с другими промокодами. Бонус за друга начисляется один раз — после того как друг получит свой первый заказ.</p>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ asset('js/friends-page.js') }}"></script>{% endblock %}

@@ -63,7 +63,7 @@ void main() {
   });
 
   testWidgets('work hours: default Mon–Sat 10–22, saved text', (tester) async {
-    final c = await pumpAdmin(tester, const Size(1440, 1200));
+    final c = await pumpAdmin(tester, const Size(1440, 4000));
     await login(tester, c, 'owner@saasshop.local');
     await tester.tap(find.text('Магазин и доставка').first);
     await settle(tester);
@@ -83,7 +83,7 @@ void main() {
   });
 
   testWidgets('socials: accepts @name, rejects foreign links', (tester) async {
-    final c = await pumpAdmin(tester, const Size(1440, 1400));
+    final c = await pumpAdmin(tester, const Size(1440, 4400));
     await login(tester, c, 'owner@saasshop.local');
     await tester.tap(find.text('Магазин и доставка').first);
     await settle(tester);

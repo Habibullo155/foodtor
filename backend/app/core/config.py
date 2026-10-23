@@ -20,10 +20,8 @@ class Settings(BaseSettings):
     cors_origins: list[str] = []
     max_import_file_mb: int = 10
 
-    # Витрина: название и контакты (шапка, подвал, «Контакты», письма)
+    # Название витрины. Контакты, доставка и реквизиты — в админке («Магазин и доставка»)
     shop_name: str = "FOODTOR"
-    shop_phone: str = "+7 (900) 000-00-00"
-    shop_email: str = "hello@shop.example.ru"
 
     # Публичные адреса (нужны для returnUrl оплаты и ссылок в письмах)
     public_shop_url: str = "http://localhost:8765"
@@ -44,10 +42,6 @@ class Settings(BaseSettings):
 
     # Часовой пояс магазина: дни в отчётах и «сегодня» — по местному времени, не по UTC
     timezone: str = "Europe/Moscow"
-
-    free_courier_from: int = 1500
-    courier_fee: int = 199
-    express_fee: int = 149
 
     # Альфа-Банк, интернет-эквайринг (REST). Тестовый стенд по умолчанию; боевой — https://pay.alfabank.ru/payment/rest
     alfa_api_url: str = "https://alfa.rbsuat.com/payment/rest"

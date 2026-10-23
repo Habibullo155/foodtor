@@ -1,15 +1,11 @@
 """API админ-панели. Каждый эндпоинт закрыт конкретным правом (RBAC), а не ролью."""
 
-import io
-import secrets
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
-from pathlib import Path
 from typing import Annotated, Literal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
-from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from sqlalchemy import Date, cast, func, select, update
 from sqlalchemy.orm import selectinload
@@ -40,6 +36,7 @@ from app.models import (
 )
 from app.schemas.catalog import MoneyOut
 from app.schemas.orders import AdminOrderOut, DayOut, FinanceOut, Totals
+from app.services import images
 from app.services.bootstrap import ensure_system_roles
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -200,7 +197,7 @@ class ProductIn(BaseModel):
     is_active: bool = True
     is_hit: bool = False
     attributes: dict[str, str] = Field(default_factory=dict, max_length=30)
-    image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/products/|/static/)")
+    image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/|/static/)")
 
 
 class ProductPatch(BaseModel):
@@ -217,7 +214,7 @@ class ProductPatch(BaseModel):
     is_active: bool | None = None
     is_hit: bool | None = None
     attributes: dict[str, str] | None = None
-    image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/products/|/static/)")
+    image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/|/static/)")
 
 
 @router.get("/products", response_model=list[AdminProductOut], dependencies=[guard(Permission.PRODUCTS_READ)])
@@ -280,7 +277,7 @@ class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     slug: str = Field(min_length=1, max_length=140, pattern=r"^[a-z0-9\-]+$")
     parent_id: int | None = None
-    image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/products/|/static/)")
+    image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/|/static/)")
     position: int = 0
 
 
@@ -395,38 +392,10 @@ async def moderate_reviews_bulk(
     return {"updated": result.rowcount}
 
 
-PRODUCT_IMAGE_MAX_BYTES = 10 * 1024 * 1024
-PRODUCT_IMAGE_MIN_SIDE = 300  # меньше — на карточке будет мыльно
-PRODUCT_IMAGE_MAX_SIDE = 1200  # больше не нужно даже на Retina; уменьшаем — витрина грузится быстрее
-
-
 class UploadedImageOut(BaseModel):
     url: str
     width: int
     height: int
-
-
-def _process_product_image(raw: bytes) -> tuple[bytes, int, int]:
-    """Проверка, поворот по EXIF, уменьшение до 1200 px, WebP без метаданных. Прозрачный фон сохраняется."""
-    try:
-        img = Image.open(io.BytesIO(raw))
-        img.verify()
-        img = ImageOps.exif_transpose(Image.open(io.BytesIO(raw)))
-    except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as exc:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY, "Это не изображение — загрузите JPG, PNG или WebP"
-        ) from exc
-    if min(img.size) < PRODUCT_IMAGE_MIN_SIDE:
-        raise HTTPException(
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-            f"Фото слишком маленькое ({img.width}×{img.height}). Нужно от {PRODUCT_IMAGE_MIN_SIDE}×"
-            f"{PRODUCT_IMAGE_MIN_SIDE} px, лучше 1000×1000",
-        )
-    img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
-    img.thumbnail((PRODUCT_IMAGE_MAX_SIDE, PRODUCT_IMAGE_MAX_SIDE), Image.Resampling.LANCZOS)
-    out = io.BytesIO()
-    img.save(out, "WEBP", quality=85, method=6)
-    return out.getvalue(), img.width, img.height
 
 
 @router.post(
@@ -436,17 +405,20 @@ def _process_product_image(raw: bytes) -> tuple[bytes, int, int]:
     dependencies=[guard(Permission.PRODUCTS_WRITE)],
 )
 @limiter.limit("120/hour")  # хватит на заливку каталога, но не на забивание диска
-async def upload_product_image(request: Request, file: Annotated[UploadFile, File()]) -> UploadedImageOut:
-    """Фото с компьютера → /media/products/<случайное>.webp. URL затем сохраняется в товаре."""
-    raw = await file.read(PRODUCT_IMAGE_MAX_BYTES + 1)
-    if len(raw) > PRODUCT_IMAGE_MAX_BYTES:
+async def upload_product_image(
+    request: Request,
+    file: Annotated[UploadFile, File()],
+    kind: Literal["products", "banners"] = "products",
+) -> UploadedImageOut:
+    """Фото с компьютера → /media/<kind>/<случайное>.webp. URL затем сохраняется в товаре, категории или баннере."""
+    raw = await file.read(images.MAX_BYTES + 1)
+    if len(raw) > images.MAX_BYTES:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "Файл больше 10 МБ — уменьшите фото")
-    data, w, h = _process_product_image(raw)
-    folder = Path(get_settings().media_root) / "products"
-    folder.mkdir(parents=True, exist_ok=True)
-    name = f"{secrets.token_hex(12)}.webp"
-    (folder / name).write_bytes(data)
-    return UploadedImageOut(url=f"{get_settings().media_url}/products/{name}", width=w, height=h)
+    try:
+        url, w, h = images.store(raw, kind)
+    except images.ImageError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    return UploadedImageOut(url=url, width=w, height=h)
 
 
 class TierIn(BaseModel):

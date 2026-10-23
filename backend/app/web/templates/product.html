@@ -67,9 +67,10 @@
         <p class="warn">Сейчас нет в наличии</p>
       {% endif %}
       <ul class="pdp__delivery">
-        <li>{{ icon('bolt') }} Экспресс за 2 часа — {{ express_fee|rub }}</li>
-        <li>{{ icon('truck') }} Курьер — {{ courier_fee|rub }}, бесплатно от {{ free_from|rub }}</li>
-        <li>{{ icon('store') }} Самовывоз — бесплатно</li>
+        {% if delivery.express_enabled %}<li>{{ icon('bolt') }} {{ delivery.express_label }} — {{ delivery.express_fee|rub }}</li>{% endif %}
+        <li>{{ icon('truck') }} Курьер — {% if delivery.free_from == 0 %}бесплатно{% else %}{{ delivery.courier_fee|rub }}{% if delivery.free_from %}, бесплатно от {{ delivery.free_from|rub }}{% endif %}{% endif %}</li>
+        {% if delivery.pickup_enabled %}<li>{{ icon('store') }} Самовывоз — бесплатно</li>{% endif %}
+        <li class="muted">Доставка — при заказе от {{ delivery.min_order|rub }}</li>
       </ul>
     </div>
 

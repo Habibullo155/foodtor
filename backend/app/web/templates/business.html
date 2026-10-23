@@ -11,7 +11,7 @@
 <ul class="biz-cards">
   <li>{{ icon('store') }}<b>Оптовые цены</b><span>Персональный прайс для вашей компании и скидки на целые категории.</span></li>
   <li>{{ icon('grid') }}<b>Дешевле от объёма</b><span>Чем больше берёте — тем ниже цена за штуку или килограмм.</span></li>
-  <li>{{ icon('truck') }}<b>Доставка {{ hours.days_text }}</b><span>{{ hours.time_text|capitalize }}, бесплатно при заказе от {{ free_from|rub }}.</span></li>
+  <li>{{ icon('truck') }}<b>Доставка {{ hours.days_text }}</b><span>{{ hours.time_text|capitalize }}{% if delivery.free_from is not none %}, бесплатно при заказе от {{ delivery.free_from|rub }}{% endif %}.</span></li>
   <li>{{ icon('shield') }}<b>Оплата при получении</b><span>Наличными или картой — без предоплаты.</span></li>
 </ul>
 

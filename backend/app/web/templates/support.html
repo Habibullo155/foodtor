@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block content %}
+<nav class="crumbs" aria-label="Навигация"><a href="/">Главная</a>{{ icon('chevron') }}<span>Поддержка</span></nav>
+<div class="support">
+  <section class="panel support__chat" data-support>
+    <header class="support__head">
+      <span class="support__avatar">{{ icon('headset') }}</span>
+      <div><h1>Поддержка {{ shop_name }}</h1><p class="muted small">Отвечаем {{ hours.text }}. Ответ придёт сюда же.</p></div>
+    </header>
+    <div class="support__body" data-support-body><div class="skeleton"></div></div>
+    <form class="chat-form" data-support-form hidden>
+      <textarea class="input" name="text" rows="2" maxlength="2000" required placeholder="Опишите вопрос — номер заказа, что случилось…"></textarea>
+      <button class="btn btn--primary" type="submit">Отправить</button>
+    </form>
+  </section>
+  <aside class="support__side">
+    <div class="panel">
+      <h2>Другие способы связи</h2>
+      <p><a href="tel:{{ contacts.tel }}">{{ icon('phone') }} {{ contacts.phone }}</a></p>
+      {% if contacts.email %}<p><a href="mailto:{{ contacts.email }}">{{ icon('mail') }} {{ contacts.email }}</a></p>{% endif %}
+      {% if socials.telegram %}<p><a href="{{ socials.telegram }}" target="_blank" rel="noopener">{{ icon('telegram') }} Telegram</a></p>{% endif %}
+    </div>
+    <div class="panel">
+      <h2>Частые вопросы</h2>
+      <details><summary>Когда привезут заказ?</summary><p>Доставляем {{ hours.text }}. Статус заказа виден в <a href="/account">личном кабинете</a>, там же — чат с курьером.</p></details>
+      <details><summary>Как оплатить?</summary><p>При получении — наличными или картой курьеру. <a href="/info/payment">Подробнее</a></p></details>
+      <details><summary>Что-то не так с товаром</summary><p>Напишите нам и приложите фото — заменим или вернём деньги. <a href="/info/returns">Подробнее</a></p></details>
+      <details><summary>Какая минимальная сумма заказа?</summary><p>Доставка — от {{ delivery.min_order|rub }}.{% if delivery.pickup_enabled %} Самовывоз — на любую сумму.{% endif %}</p></details>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+{% block scripts %}<script type="module" src="{{ asset('js/support-page.js') }}"></script>{% endblock %}

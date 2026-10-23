@@ -261,6 +261,17 @@ class AdminCategoriesNotifier extends RemoteListNotifier<AdminCategory> {
       return null;
     }
   }
+
+  Future<bool> save(AdminCategory c) async {
+    try {
+      final saved = await repo.updateCategory(c);
+      state = [for (final x in state) x.id == saved.id ? saved : x];
+      return true;
+    } catch (e) {
+      ref.read(adminErrorProvider.notifier).report(e);
+      return false;
+    }
+  }
 }
 
 final adminCategoriesProvider =
@@ -415,6 +426,74 @@ final workHoursProvider = FutureProvider.autoDispose<WorkHours>(
 
 final socialsProvider = FutureProvider.autoDispose<ShopSocials>(
   (ref) => ref.watch(adminRepositoryProvider).socials(),
+);
+
+final shopSettingsProvider = FutureProvider.autoDispose<ShopSettings>(
+  (ref) => ref.watch(adminRepositoryProvider).shopSettings(),
+);
+
+final referralSettingsProvider = FutureProvider.autoDispose<ReferralSettings>(
+  (ref) => ref.watch(adminRepositoryProvider).referralSettings(),
+);
+
+class BannersNotifier extends RemoteListNotifier<AdminBanner> {
+  @override
+  Future<List<AdminBanner>> fetch(AdminRepository repo) => repo.banners();
+
+  Future<bool> save(AdminBanner b) async {
+    try {
+      final saved = await repo.saveBanner(b);
+      state = b.id == 0
+          ? [...state, saved]
+          : [for (final x in state) x.id == saved.id ? saved : x];
+      return true;
+    } catch (e) {
+      ref.read(adminErrorProvider.notifier).report(e);
+      return false;
+    }
+  }
+
+  Future<void> toggle(AdminBanner b) => save(b.copyWith(isActive: !b.isActive));
+
+  Future<void> delete(AdminBanner b) => optimistic([
+    for (final x in state)
+      if (x.id != b.id) x,
+  ], () => repo.deleteBanner(b.id));
+
+  Future<void> move(AdminBanner b, int delta) {
+    final list = [...state];
+    final i = list.indexWhere((x) => x.id == b.id);
+    final j = i + delta;
+    if (j < 0 || j >= list.length) return Future.value();
+    list.insert(j, list.removeAt(i));
+    return optimistic(
+      list,
+      () => repo.reorderBanners([for (final x in list) x.id]),
+    );
+  }
+}
+
+final bannersProvider = NotifierProvider<BannersNotifier, List<AdminBanner>>(
+  BannersNotifier.new,
+);
+
+class SupportThreadsNotifier extends RemoteListNotifier<SupportThread> {
+  @override
+  Future<List<SupportThread>> fetch(AdminRepository repo) =>
+      repo.supportThreads();
+
+  void markRead(int userId) =>
+      state = [for (final t in state) t.userId == userId ? t.read() : t];
+}
+
+final supportThreadsProvider =
+    NotifierProvider<SupportThreadsNotifier, List<SupportThread>>(
+      SupportThreadsNotifier.new,
+    );
+
+final supportUnreadProvider = Provider<int>(
+  (ref) =>
+      ref.watch(supportThreadsProvider).fold(0, (sum, t) => sum + t.unread),
 );
 
 class CompaniesNotifier extends RemoteListNotifier<B2BCompany> {

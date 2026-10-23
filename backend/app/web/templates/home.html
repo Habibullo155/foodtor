@@ -3,7 +3,7 @@
 {% block head %}
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org", "@type": "GroceryStore", "name": shop_name, "url": base_url,
-  "telephone": shop_phone, "email": shop_email, "priceRange": "₽", "openingHours": hours.schema, "sameAs": socials.links,
+  "telephone": contacts.phone, "email": contacts.email or none, "priceRange": "₽", "openingHours": hours.schema, "sameAs": socials.links,
   "image": base_url ~ "static/favicon.svg"
 }|tojson }}</script>
 <script type="application/ld+json">{{ {
@@ -31,11 +31,30 @@
   <button class="story-viewer__nav story-viewer__nav--next" type="button" data-next aria-label="Дальше"></button>
 </dialog>
 {% endif %}
+{% if banners %}
+<section class="banners" aria-label="Акции и новости" data-banners>
+  <div class="banners__track" data-track>
+    {% for b in banners %}
+    <article class="banner banner--{{ b.theme }}{{ ' banner--img' if b.image_url }}">
+      <div class="banner__text">
+        <h2>{{ b.title }}</h2>
+        {% if b.text %}<p>{{ b.text }}</p>{% endif %}
+        {% if b.button_label and b.link_url %}<a class="btn {{ 'btn--primary' if b.theme != 'orange' else 'btn--light' }}" href="{{ b.link_url }}"{% if b.link_url.startswith('https://') %} target="_blank" rel="noopener"{% endif %}>{{ b.button_label }}</a>{% endif %}
+      </div>
+      {% if b.image_url %}<img class="banner__img" src="{{ b.image_url }}" alt="" {{ 'fetchpriority="high"' if loop.first else 'loading="lazy"' }}>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% if banners|length > 1 %}
+  <div class="banners__dots">{% for b in banners %}<button type="button" data-dot="{{ loop.index0 }}" aria-label="Баннер {{ loop.index }}"></button>{% endfor %}</div>
+  {% endif %}
+</section>
+{% endif %}
 <section class="hero">
   <div class="hero__text">
     <div class="hero__brand">{{ icon('sprout') }} {{ shop_name }}</div>
     <h1>Свежие продукты — для вашей семьи</h1>
-    <p>Овощи, фрукты, бакалея и всё к столу. Отбираем каждое утро, привозим за 2 часа. Бесплатная доставка от {{ free_from|rub }}.</p>
+    <p>Овощи, фрукты, бакалея и всё к столу. Отбираем каждое утро и привозим {{ hours.days_text }} {{ hours.time_text }}{% if delivery.express_enabled %} — срочно за {{ delivery.express_hours }} ч{% endif %}.</p>
     <a class="btn btn--primary btn--lg" href="/catalog">Перейти в каталог</a>
   </div>
   <div class="hero__art" aria-hidden="true">
@@ -52,6 +71,14 @@
   <li>{{ icon('fast') }}<span>Быстрая доставка<br>свежих продуктов</span></li>
   <li>{{ icon('shield') }}<span>Качество<br>и забота о вас</span></li>
 </ul>
+{% if referral.enabled and (referral.friend_amount > 0 or referral.inviter_amount > 0) %}
+<a class="invite" href="/friends">
+  <span class="invite__icon">{{ icon('gift') }}</span>
+  <span class="invite__text"><b>Приведите друга — {% if referral.inviter_amount > 0 %}получите {{ referral.inviter_amount|rub }}{% else %}порадуйте его скидкой{% endif %}</b>
+    <span>{% if referral.friend_amount > 0 %}Другу — {{ referral.friend_amount|rub }} на первый заказ. {% endif %}Бонус приходит, когда друг получит свой первый заказ</span></span>
+  <span class="btn btn--primary invite__btn">Пригласить</span>
+</a>
+{% endif %}
 
 <section class="section" data-collapsible="categories">
   <div class="section__head">
@@ -93,4 +120,4 @@
   </div>
 </section>
 {% endblock %}
-{% block scripts %}{% if stories %}<script type="module" src="{{ asset('js/stories.js') }}"></script>{% endif %}{% endblock %}
+{% block scripts %}{% if banners|length > 1 %}<script type="module" src="{{ asset('js/banners.js') }}"></script>{% endif %}{% if stories %}<script type="module" src="{{ asset('js/stories.js') }}"></script>{% endif %}{% endblock %}

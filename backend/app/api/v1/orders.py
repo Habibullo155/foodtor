@@ -21,8 +21,9 @@ from app.models import DeliveryMethod, Order, OrderStatus, PaymentMethod, Paymen
 from app.models.order import ACTIVE_PICKING_STATUSES, PICKABLE_PAYMENT
 from app.schemas.loyalty import LoyaltyProgress
 from app.schemas.orders import CheckoutIn, OrderLineOut, OrderOut, PayOut, QuoteIn, QuoteLineOut, QuoteOut
+from app.services import shop_info
 from app.services.cart import CartService, LineRequest
-from app.services.checkout import PromoError, PromoService, delivery_fee
+from app.services.checkout import PromoError, PromoService
 from app.services.geo import Point, check_delivery, get_settings_row
 from app.services.loyalty import LoyaltyService
 from app.services.orders import OrderError, OrderService
@@ -122,14 +123,16 @@ async def quote(
     promo_discount, promo_error = Decimal("0"), None
     if body.promo_code:
         try:
-            promo = await PromoService(session).get_valid(body.promo_code)
+            promo = await PromoService(session).get_valid(body.promo_code, user)
             if q.total < promo.min_order:
                 promo_error = f"Промокод действует от {promo.min_order:.0f} ₽"
             else:
                 promo_discount = min(promo.amount, q.total)
         except PromoError as exc:
             promo_error = str(exc)
-    fee = delivery_fee(body.delivery, q.total)
+    settings = await get_settings_row(session)
+    rules = shop_info.from_row(settings).delivery
+    fee = rules.fee(body.delivery, q.total)
     return QuoteOut(
         lines=[
             QuoteLineOut(
@@ -149,9 +152,11 @@ async def quote(
         delivery_fee=fee,
         total=q.total - promo_discount + fee,
         tier_name=q.tier_name,
-        free_delivery_from=Decimal(get_settings().free_courier_from),
+        free_delivery_from=rules.free_from,
+        delivery_min_order=rules.min_order,
+        delivery_problem=rules.problem(body.delivery, q.total),
         wholesale=q.audience == "b2b",
-        wholesale_min_order=(await get_settings_row(session)).wholesale_min_order if q.audience == "b2b" else None,
+        wholesale_min_order=settings.wholesale_min_order if q.audience == "b2b" else None,
     )
 
 
@@ -168,7 +173,7 @@ async def checkout(
     orders: Annotated[OrderService, Depends(get_order_service)],
 ) -> OrderOut:
     if body.payment is PaymentMethod.CARD_ONLINE and not get_settings().payments_enabled:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Online payment is not available yet")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Invalid payment method")
     if body.delivery is not DeliveryMethod.PICKUP:
         # Жёсткая проверка зоны на сервере: подсказка в UI — лишь удобство, обойти её нельзя
         point = Point(body.lat, body.lng) if body.lat is not None and body.lng is not None else None
@@ -206,7 +211,7 @@ async def checkout(
 async def pay_again(order_id: int, user: CurrentUser, session: SessionDep) -> PayOut:
     """Вернуться к оплате (закрыл вкладку банка и т.п.): ссылка банка живёт ~20 минут, потом выдаём новую."""
     order = await session.get(Order, order_id, with_for_update=True)
-    if order is None or order.user_id != user.id:
+    if order is None or order.user_id != user.id or not get_settings().payments_enabled:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Order not found")
     if order.payment_method is not PaymentMethod.CARD_ONLINE or order.payment_status is PaymentStatus.PAID:
         raise HTTPException(status.HTTP_409_CONFLICT, "Order does not need payment")

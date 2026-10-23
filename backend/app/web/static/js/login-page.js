@@ -1,4 +1,4 @@
-import { $, $$, acceptTokens, api, me } from './core.js';
+import { $, $$, acceptTokens, api, me, referralCode } from './core.js';
 import { attachPhoneMask, phoneComplete } from './phone.js';
 
 const root = $('[data-auth]');
@@ -110,7 +110,7 @@ $('[data-resend]', root).addEventListener('click', () => busy(steps.code, () => 
 steps.name.addEventListener('submit', (e) => {
   e.preventDefault();
   busy(e.target, async () => {
-    const r = await api(`/auth/${path()}/complete`, { method: 'POST', json: { signup_token: signupToken, full_name: e.target.name.value.trim() }, auth: false });
+    const r = await api(`/auth/${path()}/complete`, { method: 'POST', json: { signup_token: signupToken, full_name: e.target.name.value.trim(), ref: referralCode() }, auth: false });
     done(r);
   });
 });

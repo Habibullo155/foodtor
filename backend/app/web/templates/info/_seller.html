@@ -1,0 +1,8 @@
+<dl class="requisites">
+  <div><dt>Продавец</dt><dd>{{ legal.name or shop_name }}</dd></div>
+  {% if legal.inn %}<div><dt>ИНН</dt><dd>{{ legal.inn }}</dd></div>{% endif %}
+  {% if legal.ogrn %}<div><dt>{{ 'ОГРНИП' if legal.ogrn|length == 15 else 'ОГРН' }}</dt><dd>{{ legal.ogrn }}</dd></div>{% endif %}
+  {% if legal.address %}<div><dt>Адрес</dt><dd>{{ legal.address }}</dd></div>{% endif %}
+  <div><dt>Телефон</dt><dd><a href="tel:{{ contacts.tel }}">{{ contacts.phone }}</a></dd></div>
+  {% if contacts.email %}<div><dt>Почта</dt><dd><a href="mailto:{{ contacts.email }}">{{ contacts.email }}</a></dd></div>{% endif %}
+</dl>

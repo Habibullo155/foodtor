@@ -28,10 +28,36 @@ abstract interface class AdminRepository {
   Future<List<AdminCategory>> categories();
   Future<AdminProduct> saveProduct(AdminProduct product, {required bool isNew});
   Future<AdminCategory> createCategory(String name, String slug);
+  Future<AdminCategory> updateCategory(AdminCategory category);
   Future<String> importProducts(String filename, List<int> bytes);
 
+  /// Все товары в Excel: цены, остатки, ссылки на фото — поправить и загрузить обратно.
+  Future<List<int>> exportProducts();
+
   /// Фото с компьютера → адрес для поля image_url (сервер проверит, уменьшит и пересохранит в WebP).
-  Future<String> uploadProductImage(String filename, List<int> bytes);
+  /// kind: products — до 1200 px, banners — до 1800 px.
+  Future<String> uploadProductImage(
+    String filename,
+    List<int> bytes, {
+    String kind = 'products',
+  });
+
+  Future<ShopSettings> shopSettings();
+  Future<ShopSettings> saveShopSettings(ShopSettings settings);
+  Future<ReferralSettings> referralSettings();
+  Future<ReferralSettings> saveReferralSettings(ReferralSettings settings);
+
+  Future<List<AdminBanner>> banners();
+  Future<AdminBanner> saveBanner(AdminBanner banner);
+  Future<void> deleteBanner(int id);
+  Future<void> reorderBanners(List<int> ids);
+
+  Future<List<SupportThread>> supportThreads();
+  Future<List<SupportMessage>> supportThread(int userId);
+  Future<List<SupportMessage>> answerSupport(int userId, String text);
+
+  /// Своё имя и телефон (видны в заказах и переписке).
+  Future<void> updateMyProfile({required String name, required String phone});
   Future<List<AdminReview>> reviews();
   Future<void> moderate(int id, {required bool approve});
   Future<int> moderateMany(List<int> ids, {required bool approve});
@@ -179,6 +205,7 @@ class ApiAdminRepository implements AdminRepository {
           c['id'] as int,
           c['name'] as String,
           c['slug'] as String?,
+          c['image_url'] as String?,
         ),
     ],
   );
@@ -205,20 +232,149 @@ class ApiAdminRepository implements AdminRepository {
           '/api/v1/admin/categories',
           data: {'name': name, 'slug': slug},
         );
-        return AdminCategory(r.data!['id'] as int, name);
+        return AdminCategory(r.data!['id'] as int, name, slug);
       });
 
   @override
-  Future<String> uploadProductImage(String filename, List<int> bytes) =>
-      _wrap(() async {
-        final r = await _dio.post<Map<String, dynamic>>(
-          '/api/v1/admin/uploads/product-image',
-          data: FormData.fromMap({
-            'file': MultipartFile.fromBytes(bytes, filename: filename),
-          }),
-        );
-        return r.data!['url'] as String;
-      });
+  Future<AdminCategory> updateCategory(AdminCategory c) => _wrap(() async {
+    await _dio.patch<dynamic>(
+      '/api/v1/admin/categories/${c.id}',
+      data: {'name': c.name, 'slug': c.slug, 'image_url': c.imageUrl},
+    );
+    return c;
+  });
+
+  @override
+  Future<List<int>> exportProducts() => _wrap(
+    () async => (await _dio.get<List<int>>(
+      '/api/v1/admin/products/export',
+      queryParameters: {'format': 'xlsx'},
+      options: Options(responseType: ResponseType.bytes),
+    )).data!,
+  );
+
+  @override
+  Future<ShopSettings> shopSettings() => _wrap(
+    () async => ShopSettings.fromJson(
+      (await _dio.get<Map<String, dynamic>>('/api/v1/admin/settings/shop'))
+          .data!,
+    ),
+  );
+
+  @override
+  Future<ShopSettings> saveShopSettings(ShopSettings s) => _wrap(
+    () async => ShopSettings.fromJson(
+      (await _dio.put<Map<String, dynamic>>(
+        '/api/v1/admin/settings/shop',
+        data: s.toJson(),
+      )).data!,
+    ),
+  );
+
+  @override
+  Future<ReferralSettings> referralSettings() => _wrap(
+    () async => ReferralSettings.fromJson(
+      (await _dio.get<Map<String, dynamic>>('/api/v1/admin/settings/referral'))
+          .data!,
+    ),
+  );
+
+  @override
+  Future<ReferralSettings> saveReferralSettings(ReferralSettings s) => _wrap(
+    () async => ReferralSettings.fromJson(
+      (await _dio.put<Map<String, dynamic>>(
+        '/api/v1/admin/settings/referral',
+        data: s.toJson(),
+      )).data!,
+    ),
+  );
+
+  @override
+  Future<List<AdminBanner>> banners() => _wrap(
+    () async => [
+      for (final b in _list(await _dio.get<dynamic>('/api/v1/admin/banners')))
+        AdminBanner.fromJson(b),
+    ],
+  );
+
+  @override
+  Future<AdminBanner> saveBanner(AdminBanner b) => _wrap(() async {
+    final r = b.id == 0
+        ? await _dio.post<Map<String, dynamic>>(
+            '/api/v1/admin/banners',
+            data: b.toJson(),
+          )
+        : await _dio.put<Map<String, dynamic>>(
+            '/api/v1/admin/banners/${b.id}',
+            data: b.toJson(),
+          );
+    return AdminBanner.fromJson(r.data!);
+  });
+
+  @override
+  Future<void> deleteBanner(int id) =>
+      _wrap(() => _dio.delete<dynamic>('/api/v1/admin/banners/$id'));
+
+  @override
+  Future<void> reorderBanners(List<int> ids) => _wrap(
+    () => _dio.put<dynamic>('/api/v1/admin/banners-order', data: {'ids': ids}),
+  );
+
+  @override
+  Future<List<SupportThread>> supportThreads() => _wrap(
+    () async => [
+      for (final t in _list(await _dio.get<dynamic>('/api/v1/admin/support')))
+        SupportThread.fromJson(t),
+    ],
+  );
+
+  @override
+  Future<List<SupportMessage>> supportThread(int userId) => _wrap(
+    () async => [
+      for (final m in _list(
+        await _dio.get<dynamic>('/api/v1/admin/support/$userId'),
+      ))
+        SupportMessage.fromJson(m),
+    ],
+  );
+
+  @override
+  Future<List<SupportMessage>> answerSupport(int userId, String text) => _wrap(
+    () async => [
+      for (final m in _list(
+        await _dio.post<dynamic>(
+          '/api/v1/admin/support/$userId',
+          data: {'text': text},
+        ),
+      ))
+        SupportMessage.fromJson(m),
+    ],
+  );
+
+  @override
+  Future<void> updateMyProfile({required String name, required String phone}) =>
+      _wrap(
+        () => _dio.patch<dynamic>(
+          '/api/v1/me/profile',
+          data: {'full_name': name, 'phone': phone},
+        ),
+      );
+
+  @override
+  Future<String> uploadProductImage(
+    String filename,
+    List<int> bytes, {
+    String kind = 'products',
+  }) => _wrap(() async {
+    final r = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/admin/uploads/product-image',
+      queryParameters: {'kind': kind},
+      data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      }),
+    );
+    return r.data!['url'] as String;
+  });
 
   @override
   Future<String> importProducts(
@@ -232,7 +388,10 @@ class ApiAdminRepository implements AdminRepository {
       }),
     );
     final j = r.data!;
-    return 'Создано: ${j['created']}, обновлено: ${j['updated']}, с ошибками: ${j['failed']}';
+    final photos = (j['images_downloaded'] as int? ?? 0) > 0
+        ? ', фото загружено: ${j['images_downloaded']}'
+        : '';
+    return 'Новых: ${j['created']}, обновлено: ${j['updated']}$photos, с ошибками: ${j['failed']}';
   });
 
   @override
@@ -848,10 +1007,155 @@ class DemoAdminRepository implements AdminRepository {
   }
 
   @override
-  Future<AdminCategory> createCategory(String name, String slug) async =>
-      AdminCategory(100 + _categories.length, name);
+  Future<AdminCategory> createCategory(String name, String slug) async {
+    final c = AdminCategory(100 + _categories.length, name, slug);
+    _categories.add(c);
+    return c;
+  }
+
   @override
-  Future<String> uploadProductImage(String filename, List<int> bytes) async {
+  Future<AdminCategory> updateCategory(AdminCategory c) async {
+    final i = _categories.indexWhere((x) => x.id == c.id);
+    if (i >= 0) _categories[i] = c;
+    return c;
+  }
+
+  @override
+  Future<List<int>> exportProducts() async => utf8.encode(
+    'Артикул;Название;Цена\n${[for (final p in _products) '${p.sku};${p.name};${p.price}'].join('\n')}',
+  );
+
+  ShopSettings _shop = const ShopSettings();
+  @override
+  Future<ShopSettings> shopSettings() async => _shop;
+  @override
+  Future<ShopSettings> saveShopSettings(ShopSettings s) async => _shop = s;
+
+  ReferralSettings _referral = const ReferralSettings();
+  @override
+  Future<ReferralSettings> referralSettings() async => _referral;
+  @override
+  Future<ReferralSettings> saveReferralSettings(ReferralSettings s) async =>
+      _referral = s;
+
+  late final List<AdminBanner> _banners = [
+    AdminBanner(
+      id: 1,
+      title: 'Неделя ягод',
+      text: 'Клубника и голубика со скидкой до 20%',
+      imageUrl: ingredientImage('strawberries'),
+      buttonLabel: 'Смотреть',
+      linkUrl: '/promo',
+    ),
+    const AdminBanner(
+      id: 2,
+      title: 'Оптовые цены для кафе',
+      text: 'Подключим ваш бизнес за день',
+      buttonLabel: 'Оставить заявку',
+      linkUrl: '/business',
+      theme: BannerTheme.cream,
+      isActive: false,
+    ),
+  ];
+  @override
+  Future<List<AdminBanner>> banners() async => List.of(_banners);
+  @override
+  Future<AdminBanner> saveBanner(AdminBanner b) async {
+    final saved = b.id == 0
+        ? b.copyWith(id: _banners.fold(0, (m, x) => max(m, x.id)) + 1)
+        : b;
+    final i = _banners.indexWhere((x) => x.id == saved.id);
+    i < 0 ? _banners.add(saved) : _banners[i] = saved;
+    return saved;
+  }
+
+  @override
+  Future<void> deleteBanner(int id) async =>
+      _banners.removeWhere((x) => x.id == id);
+  @override
+  Future<void> reorderBanners(List<int> ids) async =>
+      _banners.sort((a, b) => ids.indexOf(a.id).compareTo(ids.indexOf(b.id)));
+
+  late final Map<int, List<SupportMessage>> _support = {
+    51: [
+      SupportMessage(
+        id: 1,
+        text: 'Здравствуйте! Можно привезти заказ после 20:00?',
+        fromStaff: false,
+        author: 'Вы',
+        createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
+      ),
+    ],
+    52: [
+      SupportMessage(
+        id: 2,
+        text: 'Добавьте, пожалуйста, гречку «Мистраль»',
+        fromStaff: false,
+        author: 'Вы',
+        createdAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      SupportMessage(
+        id: 3,
+        text: 'Спасибо! Завезём на этой неделе',
+        fromStaff: true,
+        author: 'Анна',
+        createdAt: DateTime.now().subtract(const Duration(hours: 20)),
+      ),
+    ],
+  };
+  final Set<int> _supportRead = {52};
+  static const _supportPeople = {51: 'Мария Кузнецова', 52: 'Олег Смирнов'};
+
+  @override
+  Future<List<SupportThread>> supportThreads() async => [
+    for (final e in _support.entries)
+      SupportThread(
+        userId: e.key,
+        name: _supportPeople[e.key] ?? 'Покупатель',
+        phone: '+7916000${e.key}00',
+        lastText: e.value.last.text,
+        lastAt: e.value.last.createdAt,
+        lastFromStaff: e.value.last.fromStaff,
+        unread: _supportRead.contains(e.key)
+            ? 0
+            : e.value.where((m) => !m.fromStaff).length,
+      ),
+  ]..sort((a, b) => b.lastAt.compareTo(a.lastAt));
+
+  @override
+  Future<List<SupportMessage>> supportThread(int userId) async {
+    _supportRead.add(userId);
+    return List.of(_support[userId] ?? const []);
+  }
+
+  @override
+  Future<List<SupportMessage>> answerSupport(int userId, String text) async {
+    final thread = _support.putIfAbsent(userId, () => []);
+    thread.add(
+      SupportMessage(
+        id: DateTime.now().microsecondsSinceEpoch,
+        text: text,
+        fromStaff: true,
+        author: 'Поддержка',
+        createdAt: DateTime.now(),
+      ),
+    );
+    _supportRead.add(userId);
+    return List.of(thread);
+  }
+
+  @override
+  Future<void> updateMyProfile({
+    required String name,
+    required String phone,
+  }) async {}
+
+  @override
+  Future<String> uploadProductImage(
+    String filename,
+    List<int> bytes, {
+    String kind = 'products',
+  }) async {
     // демо без сервера: картинка живёт в памяти вкладки (data:-адрес)
     final ext = filename.split('.').last.toLowerCase();
     final mime = ext == 'png' ? 'png' : (ext == 'webp' ? 'webp' : 'jpeg');

@@ -41,10 +41,12 @@ class AdminSession {
     required this.role,
     this.grantedPermissions,
     this.title,
+    this.phone,
   });
   final String email;
   final String name;
   final String role;
+  final String? phone;
   final Set<Permission>?
   grantedPermissions; // из GET /auth/me (релиз); в демо — по роли
   final String? title;
@@ -110,6 +112,7 @@ class AdminAuthNotifier extends Notifier<AdminSession?> {
         name: me['full_name'] as String,
         role: me['role'] as String,
         title: me['role_title'] as String?,
+        phone: me['phone'] as String?,
         grantedPermissions: Permission.parse(
           (me['permissions'] as List).cast<String>(),
         ),
@@ -170,6 +173,20 @@ class AdminAuthNotifier extends Notifier<AdminSession?> {
     );
     ref.read(permissionsProvider.notifier).set(state!.permissions);
     return const LoginOk();
+  }
+
+  /// Имя и телефон поменяли в профиле — шапка и меню сразу показывают новые.
+  void updateProfile({required String name, required String phone}) {
+    final s = state;
+    if (s == null) return;
+    state = AdminSession(
+      email: s.email,
+      name: name,
+      role: s.role,
+      grantedPermissions: s.grantedPermissions,
+      title: s.title,
+      phone: phone,
+    );
   }
 
   /// Тесты без DEMO_ACCOUNTS.md (CI): вход без пароля под демо-сотрудником.

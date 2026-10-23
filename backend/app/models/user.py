@@ -161,6 +161,9 @@ class User(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     # Токены, выпущенные раньше этого момента, недействительны (смена пароля, «выйти везде»)
     tokens_valid_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    referral_code: Mapped[str | None] = mapped_column(String(16), unique=True)
+    referred_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    referral_rewarded: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # бонус пригласившему выдан
 
     role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"))
     role: Mapped[Role] = relationship(back_populates="users", lazy="joined")

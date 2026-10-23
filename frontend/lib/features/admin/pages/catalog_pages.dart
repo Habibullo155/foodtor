@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/download/save_file.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/app_image.dart';
 import '../auth/admin_auth.dart';
@@ -11,6 +13,7 @@ import '../data/admin_data.dart';
 import '../data/admin_repository.dart';
 import '../rbac.dart';
 import '../widgets/admin_widgets.dart';
+import 'categories_dialog.dart';
 
 class _ProductQuery extends Notifier<(String, int?)> {
   @override
@@ -32,6 +35,7 @@ class ProductsPage extends ConsumerWidget {
     final perms = ref.watch(permissionsProvider);
     final canWrite = perms.contains(Permission.productsWrite);
     final canImport = perms.contains(Permission.productsImport);
+    final canExport = canImport && perms.contains(Permission.financeView);
     final items = ref
         .watch(adminProductsProvider)
         .where(
@@ -72,17 +76,23 @@ class ProductsPage extends ConsumerWidget {
                   DropdownMenuEntry(value: c.id, label: c.name),
               ],
             ),
+            if (canExport)
+              OutlinedButton.icon(
+                onPressed: () => _export(context, ref),
+                icon: const Icon(Icons.download_rounded),
+                label: const Text('Выгрузить в Excel'),
+              ),
             if (canImport)
               OutlinedButton.icon(
                 onPressed: () => _import(context, ref),
                 icon: const Icon(Icons.upload_file_rounded),
-                label: const Text('Импорт .xlsx / .csv'),
+                label: const Text('Загрузить Excel'),
               ),
             if (canWrite) ...[
               OutlinedButton.icon(
-                onPressed: () => _newCategory(context, ref),
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: const Text('Категория'),
+                onPressed: () => showCategoriesManager(context),
+                icon: const Icon(Icons.category_outlined),
+                label: const Text('Категории'),
               ),
               FilledButton.icon(
                 onPressed: () => showProductEditor(context, ref),
@@ -152,41 +162,25 @@ class ProductsPage extends ConsumerWidget {
     }
   }
 
-  static Future<void> _newCategory(BuildContext context, WidgetRef ref) async {
-    final name = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Новая категория'),
-        content: TextField(
-          controller: name,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Название',
-            hintText: 'Например, «Молочные продукты»',
+  static Future<void> _export(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final bytes = await ref.read(adminRepositoryProvider).exportProducts();
+      final stamp = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      await saveFile(
+        'товары_$stamp.xlsx',
+        bytes,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Файл скачан. Поправьте цены и загрузите его обратно через «Загрузить Excel»',
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, true),
-            child: const Text('Создать'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && name.text.trim().isNotEmpty) {
-      final c = await ref
-          .read(adminCategoriesProvider.notifier)
-          .create(name.text.trim(), slugify(name.text));
-      if (c != null && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Категория «${c.name}» создана')),
-        );
-      }
+      );
+    } catch (e) {
+      ref.read(adminErrorProvider.notifier).report(e);
     }
   }
 }

@@ -17,8 +17,9 @@ from app.models import (
     Product,
     User,
 )
+from app.services import referrals, shop_info
 from app.services.cart import CartService, LineRequest
-from app.services.checkout import PromoService, delivery_fee
+from app.services.checkout import PromoService
 from app.services.geo import get_settings_row
 from app.services.loyalty import LoyaltyService
 
@@ -74,12 +75,14 @@ class OrderService:
             items.append(LineRequest(product, qty))
 
         quote = await self.cart.quote(user, items)  # та же цена, что пользователь видел в корзине
-        if quote.audience == "b2b":
-            minimum = (await get_settings_row(self.session)).wholesale_min_order
-            if quote.subtotal < minimum:
-                raise OrderError(f"Минимальный заказ для оптовых клиентов — {minimum:.0f} ₽")
-        promo, promo_discount = await PromoService(self.session).apply(promo_code, quote.total)
-        fee = delivery_fee(delivery, quote.total)
+        settings = await get_settings_row(self.session)
+        if quote.audience == "b2b" and quote.subtotal < settings.wholesale_min_order:
+            raise OrderError(f"Минимальный заказ для оптовых клиентов — {settings.wholesale_min_order:.0f} ₽")
+        rules = shop_info.from_row(settings).delivery
+        if problem := rules.problem(delivery, quote.total):
+            raise OrderError(problem)
+        promo, promo_discount = await PromoService(self.session).apply(promo_code, quote.total, user)
+        fee = rules.fee(delivery, quote.total)
         total = quote.total - promo_discount + fee
 
         order = Order(
@@ -155,6 +158,7 @@ class OrderService:
             await self.session.flush()  # чтобы SUM в пересчёте увидел новый статус
             # upgraded=True → точка расширения: событие в очередь уведомлений («Вы стали Gold!»)
             _tier, _upgraded = await self.loyalty.recalculate_for_user(order.user_id)
+            await referrals.reward_inviter(self.session, order.user_id)
         return order
 
     async def _restock(self, order: Order) -> None:

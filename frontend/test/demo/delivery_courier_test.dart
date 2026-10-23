@@ -57,7 +57,7 @@ void main() {
   );
 
   testWidgets('staff: owner deletes a picker (not himself)', (tester) async {
-    final c = await pumpAdmin(tester, const Size(1440, 1000));
+    final c = await pumpAdmin(tester, const Size(1440, 1400));
     await login(tester, c, 'owner@saasshop.local');
     await tester.tap(find.text('Сотрудники').first);
     await settle(tester);

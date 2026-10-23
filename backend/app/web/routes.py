@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse,
 from fastapi.templating import Jinja2Templates
 
 from app.api.deps import SessionDep
+from app.api.v1.marketing import visible_banners
 from app.api.v1.stories import visible_stories
 from app.core.config import get_settings
 from app.repositories.catalog import CatalogRepository
@@ -101,6 +102,7 @@ def site_url(request: Request, path: str, query: str = "") -> str:
 
 def render(request: Request, name: str, status_code: int = 200, **ctx) -> HTMLResponse:
     s = get_settings()
+    info = shop_info.current()
     if "canonical" not in ctx:
         ctx["canonical"] = site_url(request, request.url.path)
     ctx.setdefault("base_url", site_base(request) + "/")
@@ -109,13 +111,13 @@ def render(request: Request, name: str, status_code: int = 200, **ctx) -> HTMLRe
         name,
         {
             "shop_name": s.shop_name,
-            "shop_phone": s.shop_phone,
-            "shop_email": s.shop_email,
-            "hours": shop_info.current().hours,
-            "socials": shop_info.current().socials,
-            "free_from": s.free_courier_from,
-            "courier_fee": s.courier_fee,
-            "express_fee": s.express_fee,
+            "hours": info.hours,
+            "socials": info.socials,
+            "contacts": info.contacts,
+            "delivery": info.delivery,
+            "referral": info.referral,
+            "legal": info.legal,
+            "online_payment": s.payments_enabled,
             **ctx,
         },
         status_code=status_code,
@@ -137,6 +139,7 @@ def _decimal(v: str | None) -> Decimal | None:
 async def home(request: Request, session: SessionDep):
     cats = await data.categories(session)
     stories = await visible_stories(session)
+    banners = await visible_banners(session)
     hits = await data.rail(session, hits=True)
     sale = await data.rail(session, sale=True)
     first = await data.catalog(session, data.Filters())
@@ -148,10 +151,11 @@ async def home(request: Request, session: SessionDep):
         sale=sale,
         page=first,
         stories=stories,
+        banners=banners,
         filters=data.Filters(),
         title=f"{get_settings().shop_name} — овощи, фрукты и бакалея с доставкой",
-        description="Свежие овощи, фрукты, ягоды и бакалея с доставкой на дом. Доставка за 2 часа, "
-        f"бесплатно от {get_settings().free_courier_from} ₽.",
+        description="Свежие овощи, фрукты, ягоды и бакалея с доставкой на дом. Доставляем в удобное время, "
+        "оплата при получении.",
     )
 
 
@@ -296,11 +300,41 @@ async def business(request: Request):
     )
 
 
+@router.get("/support", response_class=HTMLResponse)
+async def support(request: Request):
+    name = get_settings().shop_name
+    return render(
+        request,
+        "support.html",
+        title=f"Поддержка | {name}",
+        heading="Поддержка",
+        description=f"Служба поддержки {name}: ответим на вопросы о заказе, доставке и оплате.",
+    )
+
+
+@router.get("/friends", response_class=HTMLResponse)
+async def friends(request: Request):
+    if not shop_info.current().referral.enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    name = get_settings().shop_name
+    return render(
+        request,
+        "friends.html",
+        title=f"Приведи друга | {name}",
+        heading="Приведи друга",
+        description="Пригласите друга в магазин — подарим скидку вам обоим.",
+    )
+
+
 router.add_api_route("/cart", _shell("cart.html", "Корзина"), response_class=HTMLResponse)
 router.add_api_route("/checkout", _shell("checkout.html", "Оформление заказа"), response_class=HTMLResponse)
 router.add_api_route("/login", _shell("login.html", "Вход"), response_class=HTMLResponse)
 router.add_api_route("/account", _shell("account.html", "Личный кабинет"), response_class=HTMLResponse)
-router.add_api_route("/payment/return", _shell("payment_return.html", "Оплата"), response_class=HTMLResponse)
+@router.get("/payment/return", response_class=HTMLResponse)
+async def payment_return(request: Request):
+    if not get_settings().payments_enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    return render(request, "payment_return.html", title=f"Оплата | {get_settings().shop_name}", noindex=True)
 
 
 @router.get("/info/{slug}", response_class=HTMLResponse)
@@ -321,8 +355,7 @@ async def info_page(request: Request, slug: str):
         f"info/{slug}.html",
         title=f"{pages[slug]} | {get_settings().shop_name}",
         heading=pages[slug],
-        noindex=slug == "about",
-    )  # «О нас» пока без текста — не отдаём поисковикам пустую страницу
+    )
 
 
 @router.get("/robots.txt", response_class=PlainTextResponse)
@@ -345,11 +378,11 @@ async def sitemap(request: Request, session: SessionDep):
         return f"<url><loc>{escape(loc)}</loc>{mod}<priority>{prio}</priority></url>"
 
     body = url(f"{base}/", prio="1.0") + url(f"{base}/catalog", prio="0.9")
-    body += url(f"{base}/promo", prio="0.8") + url(f"{base}/business", prio="0.5")
+    body += url(f"{base}/promo", prio="0.8") + url(f"{base}/business", prio="0.5") + url(f"{base}/support", prio="0.3")
     body += "".join(url(f"{base}/catalog/{c.slug}", prio="0.8") for c in cats)
     body += "".join(url(base + data.product_url(p), p.updated_at) for p in prods)
     body += "".join(
-        url(f"{base}/info/{s}", prio="0.3") for s in ("delivery", "payment", "returns", "contacts", "offer", "privacy")
+        url(f"{base}/info/{s}", prio="0.3") for s in ("about", "delivery", "payment", "returns", "contacts", "offer", "privacy")
     )
     xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{body}</urlset>'
     return Response(xml, media_type="application/xml")

@@ -21,7 +21,8 @@ async def test_default_hours_on_site_and_delivery_payment_pages(client, db):
     delivery = await client.get("/info/delivery")
     assert "Пн–Сб с 10:00 до 22:00" in delivery.text and "воскресенье — выходной" in delivery.text
     payment = await client.get("/info/payment")
-    assert payment.status_code == 200 and "наличными или банковской картой" in payment.text
+    assert payment.status_code == 200 and "Наличными" in payment.text and "Банковской картой" in payment.text
+    assert "онлайн" not in payment.text.lower()  # эквайринг не подключён — о нём ни слова
     assert 'value="card_online"' not in (await client.get("/checkout")).text
 
 

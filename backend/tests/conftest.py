@@ -62,10 +62,13 @@ async def db(_schema):
 
     from app.db.base import Base
     from app.db.session import SessionFactory
+    from app.models import ShopSettings
 
     async with SessionFactory() as s:
         tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
         await s.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+        # старые тесты рассчитаны на заказы любой суммы и прежние тарифы; новые правила проверяются отдельно
+        s.add(ShopSettings(id=1, delivery_min_order=0, free_delivery_from=1500, express_fee=149))
         await s.commit()
         yield s
 

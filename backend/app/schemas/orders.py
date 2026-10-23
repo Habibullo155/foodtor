@@ -52,7 +52,9 @@ class QuoteOut(BaseModel):
     delivery_fee: MoneyOut
     total: MoneyOut
     tier_name: str | None
-    free_delivery_from: MoneyOut
+    free_delivery_from: MoneyOut | None  # None — курьер всегда платный
+    delivery_min_order: MoneyOut
+    delivery_problem: str | None = None  # почему с этой суммой/способом заказ не оформить
     wholesale: bool = False
     wholesale_min_order: MoneyOut | None = None  # только для оптовика: меньше — заказ не оформить
 

@@ -11,6 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../data/admin_data.dart';
 import '../data/admin_repository.dart';
 import '../widgets/admin_widgets.dart';
+import 'shop_settings_cards.dart';
 
 class DeliverySettingsPage extends ConsumerWidget {
   const DeliverySettingsPage({super.key});
@@ -22,6 +23,30 @@ class DeliverySettingsPage extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(Insets.xl),
       children: [
+        switch (zone) {
+          AsyncData(:final value) => _ZoneEditor(initial: value),
+          AsyncError(:final error) => AdminCard(
+            title: 'Зона доставки',
+            child: Text('Не удалось загрузить настройки: $error'),
+          ),
+          _ => const SizedBox(
+            height: 320,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        },
+        const SizedBox(height: Insets.xl),
+        switch (ref.watch(shopSettingsProvider)) {
+          AsyncData(:final value) => ShopSettingsCards(initial: value),
+          AsyncError(:final error) => AdminCard(
+            title: 'Условия доставки',
+            child: Text('Не удалось загрузить настройки: $error'),
+          ),
+          _ => const SizedBox(
+            height: 160,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        },
+        const SizedBox(height: Insets.xl),
         switch (hours) {
           AsyncData(:final value) => _HoursCard(initial: value),
           AsyncError(:final error) => AdminCard(
@@ -41,18 +66,6 @@ class DeliverySettingsPage extends ConsumerWidget {
             child: Text('Не удалось загрузить соцсети: $error'),
           ),
           _ => const SizedBox.shrink(),
-        },
-        const SizedBox(height: Insets.xl),
-        switch (zone) {
-          AsyncData(:final value) => _ZoneEditor(initial: value),
-          AsyncError(:final error) => AdminCard(
-            title: 'Зона доставки',
-            child: Text('Не удалось загрузить настройки: $error'),
-          ),
-          _ => const SizedBox(
-            height: 320,
-            child: Center(child: CircularProgressIndicator()),
-          ),
         },
       ],
     );

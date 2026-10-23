@@ -1,7 +1,8 @@
-from typing import Annotated
+from decimal import Decimal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 from app.api.deps import SessionDep, require
 from app.core.config import get_settings
@@ -150,8 +151,7 @@ async def set_zone(body: ZoneIn, session: SessionDep) -> ZoneOut:
 
 class PaymentsOut(BaseModel):
     provider: str
-    enabled: bool
-    mode: str  # off | test | prod
+    mode: str  # test | prod
     callback_url: str
 
 
@@ -160,21 +160,26 @@ class PaymentsOut(BaseModel):
 )
 async def payments_status() -> PaymentsOut:
     s = get_settings()
-    mode = "off" if not s.payments_enabled else ("test" if "rbsuat" in s.alfa_api_url else "prod")
+    if not s.payments_enabled:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not Found")
     return PaymentsOut(
         provider="Альфа-Банк",
-        enabled=s.payments_enabled,
-        mode=mode,
+        mode="test" if "rbsuat" in s.alfa_api_url else "prod",
         callback_url=f"{s.public_api_url.rstrip('/')}/api/v1/payments/alfa/callback",
     )
 
 
 class ShopOptionsOut(BaseModel):
-    online_payment: bool  # подключён эквайринг — показывать «Картой онлайн / СБП»
-    free_courier_from: int
-    courier_fee: int
-    express_fee: int
+    min_order: MoneyOut  # курьер и экспресс — от этой суммы
+    courier_fee: MoneyOut
+    free_delivery_from: MoneyOut | None
+    express_enabled: bool
+    express_fee: MoneyOut
+    express_hours: int
+    pickup_enabled: bool
     hours: str
+    phone: str
+    email: str
     telegram: str
     instagram: str
     wholesale_min_order: MoneyOut
@@ -183,18 +188,93 @@ class ShopOptionsOut(BaseModel):
 @router.get("/shop/options", response_model=ShopOptionsOut)
 async def shop_options(session: SessionDep) -> ShopOptionsOut:
     """Публичные настройки для оформления заказа (без секретов)."""
-    s = get_settings()
     info = await shop_info.load(session)
+    d = info.delivery
     return ShopOptionsOut(
-        online_payment=s.payments_enabled,
-        free_courier_from=s.free_courier_from,
-        courier_fee=s.courier_fee,
-        express_fee=s.express_fee,
+        min_order=d.min_order,
+        courier_fee=d.courier_fee,
+        free_delivery_from=d.free_from,
+        express_enabled=d.express_enabled,
+        express_fee=d.express_fee,
+        express_hours=d.express_hours,
+        pickup_enabled=d.pickup_enabled,
         hours=info.hours.text,
+        phone=info.contacts.phone,
+        email=info.contacts.email,
         telegram=info.socials.telegram,
         instagram=info.socials.instagram,
         wholesale_min_order=(await get_settings_row(session)).wholesale_min_order,
     )
+
+
+Money = Annotated[Decimal, Field(ge=0, le=1_000_000, max_digits=12, decimal_places=2)]
+
+
+class ShopSettingsIO(BaseModel):
+    contact_phone: str = Field(min_length=5, max_length=32, pattern=r"^\+?[0-9 ()\-]{5,32}$")
+    contact_email: EmailStr | Literal[""] = ""
+    delivery_min_order: Money
+    courier_fee: Money
+    free_delivery_from: Money | None
+    express_enabled: bool
+    express_fee: Money
+    express_hours: int = Field(ge=1, le=24)
+    pickup_enabled: bool
+    legal_name: str = Field(default="", max_length=255)
+    legal_inn: str = Field(default="", pattern=r"^(\d{10}|\d{12})?$")
+    legal_ogrn: str = Field(default="", pattern=r"^(\d{13}|\d{15})?$")
+    legal_address: str = Field(default="", max_length=300)
+
+
+SHOP_FIELDS = tuple(ShopSettingsIO.model_fields)
+
+
+@router.get(
+    "/admin/settings/shop", response_model=ShopSettingsIO, dependencies=[Depends(require(Permission.PRICING_MANAGE))]
+)
+async def get_shop_settings(session: SessionDep) -> ShopSettingsIO:
+    row = await get_settings_row(session)
+    return ShopSettingsIO(**{f: getattr(row, f) for f in SHOP_FIELDS})
+
+
+@router.put(
+    "/admin/settings/shop", response_model=ShopSettingsIO, dependencies=[Depends(require(Permission.PRICING_MANAGE))]
+)
+async def set_shop_settings(body: ShopSettingsIO, session: SessionDep) -> ShopSettingsIO:
+    row = await get_settings_row(session)
+    for f in SHOP_FIELDS:
+        setattr(row, f, getattr(body, f))
+    shop_info.remember(shop_info.from_row(row))
+    return body
+
+
+class ReferralIO(BaseModel):
+    referral_enabled: bool
+    referral_friend_amount: Money
+    referral_inviter_amount: Money
+    referral_min_order: Money
+
+
+REFERRAL_FIELDS = tuple(ReferralIO.model_fields)
+
+
+@router.get(
+    "/admin/settings/referral", response_model=ReferralIO, dependencies=[Depends(require(Permission.PRICING_MANAGE))]
+)
+async def get_referral_settings(session: SessionDep) -> ReferralIO:
+    row = await get_settings_row(session)
+    return ReferralIO(**{f: getattr(row, f) for f in REFERRAL_FIELDS})
+
+
+@router.put(
+    "/admin/settings/referral", response_model=ReferralIO, dependencies=[Depends(require(Permission.PRICING_MANAGE))]
+)
+async def set_referral_settings(body: ReferralIO, session: SessionDep) -> ReferralIO:
+    row = await get_settings_row(session)
+    for f in REFERRAL_FIELDS:
+        setattr(row, f, getattr(body, f))
+    shop_info.remember(shop_info.from_row(row))
+    return body
 
 
 HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"

@@ -52,6 +52,12 @@ enum AdminSection {
   stories('Истории', Icons.amp_stories_outlined, Icons.amp_stories, {
     Permission.productsWrite,
   }),
+  marketing('Баннеры и бонусы', Icons.campaign_outlined, Icons.campaign, {
+    Permission.productsWrite,
+  }),
+  support('Поддержка', Icons.support_agent_outlined, Icons.support_agent, {
+    Permission.ordersReadAll,
+  }),
   business('Бизнес-клиенты', Icons.storefront_outlined, Icons.storefront, {
     Permission.b2bManage,
   }),
