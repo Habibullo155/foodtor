@@ -9,9 +9,9 @@ cd "$(dirname "$0")/.."
 [[ -d deploy/web/admin ]] || { echo "Сначала ./scripts/build_release.sh (сборка админки)"; exit 1; }
 
 echo "▶ Копирую файлы на $HOST:$DIR"
-rsync -az --delete --exclude '.env' --exclude 'backups/' deploy/ "$HOST:$DIR/deploy/"
+rsync -az --delete --exclude '*.env' --exclude '.env' --exclude '.env.bak' --exclude 'backups/' deploy/ "$HOST:$DIR/deploy/"
 rsync -az --delete --exclude '.env' --exclude '__pycache__' --exclude 'tests' --exclude '.demo-db' --exclude 'media' \
-  --exclude '.venv' --exclude '.server-data' --exclude '.pytest_cache' --exclude '.ruff_cache' \
+  --exclude '.venv' --exclude '.server-data' --exclude '.emoji-cache' --exclude '.pytest_cache' --exclude '.ruff_cache' \
   backend/ "$HOST:$DIR/backend/"
 
 echo "▶ Перезапуск (миграции БД применяются автоматически при старте API)"
