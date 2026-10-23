@@ -63,6 +63,8 @@ void main() {
       find.widgetWithText(TextField, 'Кнопка'),
       'Смотреть',
     );
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Белая'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Белая'));
     await tester.pump();
     await tester.tap(
       find.descendant(
@@ -72,6 +74,7 @@ void main() {
     );
     await settle(tester);
     expect(c.read(bannersProvider).last.linkUrl, '/promo');
+    expect(c.read(bannersProvider).last.buttonColor, ButtonColor.white);
 
     await tester.enterText(
       find.widgetWithText(TextField, 'Пригласившему'),

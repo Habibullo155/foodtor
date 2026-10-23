@@ -39,7 +39,7 @@
       <div class="banner__text">
         <h2>{{ b.title }}</h2>
         {% if b.text %}<p>{{ b.text }}</p>{% endif %}
-        {% if b.button_label and b.link_url %}<a class="btn {{ 'btn--primary' if b.theme != 'orange' else 'btn--light' }}" href="{{ b.link_url }}"{% if b.link_url.startswith('https://') %} target="_blank" rel="noopener"{% endif %}>{{ b.button_label }}</a>{% endif %}
+        {% if b.button_label and b.link_url %}<a class="btn banner__btn banner__btn--{{ b.button_color }}" href="{{ b.link_url }}"{% if b.link_url.startswith('https://') %} target="_blank" rel="noopener"{% endif %}>{{ b.button_label }}</a>{% endif %}
       </div>
       {% if b.image_url %}<img class="banner__img" src="{{ b.image_url }}" alt="" {{ 'fetchpriority="high"' if loop.first else 'loading="lazy"' }}>{% endif %}
     </article>

@@ -961,6 +961,18 @@ enum BannerTheme {
   final Color foreground;
 }
 
+enum ButtonColor {
+  orange('Оранжевая', Color(0xFFFFA726), Color(0xFF1F2A1F)),
+  green('Зелёная', Color(0xFF0B5D3B), Colors.white),
+  white('Белая', Colors.white, Color(0xFF17291F)),
+  dark('Тёмная', Color(0xFF17291F), Colors.white);
+
+  const ButtonColor(this.label, this.background, this.foreground);
+  final String label;
+  final Color background;
+  final Color foreground;
+}
+
 /// Баннер-слайд на главной сайта.
 @immutable
 class AdminBanner {
@@ -972,6 +984,7 @@ class AdminBanner {
     this.buttonLabel,
     this.linkUrl,
     this.theme = BannerTheme.green,
+    this.buttonColor = ButtonColor.orange,
     this.isActive = true,
     this.startsAt,
     this.endsAt,
@@ -984,6 +997,7 @@ class AdminBanner {
   final String? buttonLabel;
   final String? linkUrl;
   final BannerTheme theme;
+  final ButtonColor buttonColor;
   final bool isActive;
   final DateTime? startsAt;
   final DateTime? endsAt;
@@ -1006,6 +1020,10 @@ class AdminBanner {
       (t) => t.name == j['theme'],
       orElse: () => BannerTheme.green,
     ),
+    buttonColor: ButtonColor.values.firstWhere(
+      (c) => c.name == j['button_color'],
+      orElse: () => ButtonColor.orange,
+    ),
     isActive: j['is_active'] as bool? ?? true,
     startsAt: j['starts_at'] == null
         ? null
@@ -1022,6 +1040,7 @@ class AdminBanner {
     'button_label': buttonLabel,
     'link_url': linkUrl,
     'theme': theme.name,
+    'button_color': buttonColor.name,
     'is_active': isActive,
     'starts_at': startsAt?.toUtc().toIso8601String(),
     'ends_at': endsAt?.toUtc().toIso8601String(),
@@ -1035,6 +1054,7 @@ class AdminBanner {
     buttonLabel: buttonLabel,
     linkUrl: linkUrl,
     theme: theme,
+    buttonColor: buttonColor,
     isActive: isActive ?? this.isActive,
     startsAt: startsAt,
     endsAt: endsAt,

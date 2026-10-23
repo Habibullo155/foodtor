@@ -18,6 +18,7 @@ class Banner(TimestampMixin, Base):
     button_label: Mapped[str | None] = mapped_column(String(40))
     link_url: Mapped[str | None] = mapped_column(String(300))
     theme: Mapped[str] = mapped_column(String(10), default="green")  # green | orange | cream
+    button_color: Mapped[str] = mapped_column(String(10), default="orange", server_default="orange")  # orange | green | white | dark
     position: Mapped[int] = mapped_column(Integer, default=0, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

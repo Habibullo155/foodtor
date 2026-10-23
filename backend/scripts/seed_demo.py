@@ -28,6 +28,7 @@ from app.models import (
     AccountType,
     B2BAccount,
     B2BStatus,
+    Banner,
     Category,
     DeliveryMethod,
     LoyaltyTier,
@@ -247,6 +248,35 @@ STORIES = [  # (подпись, цвет, обложка, [(картинка, з
 ]
 
 
+async def seed_banners(session):
+    if await session.scalar(select(func.count()).select_from(Banner)):
+        return
+    session.add_all(
+        [
+            Banner(
+                title="Неделя ягод",
+                text="Клубника и голубика со скидкой до 20% — собраны вчера, у вас сегодня",
+                image_url=IMG.format("strawberries.webp"),
+                button_label="Смотреть акции",
+                link_url="/promo",
+                theme="green",
+                button_color="orange",
+                position=0,
+            ),
+            Banner(
+                title="Приведите друга — получите 300 ₽",
+                text="Другу — 300 ₽ на первый заказ",
+                image_url=IMG.format("avocado.webp"),
+                button_label="Пригласить",
+                link_url="/friends",
+                theme="orange",
+                button_color="white",
+                position=1,
+            ),
+        ]
+    )
+
+
 async def seed_stories(session):
     if await session.scalar(select(func.count()).select_from(Story)):
         return
@@ -324,6 +354,7 @@ async def main() -> None:
         staff = await seed_staff(session, roles)
         await seed_tiers(session)
         await seed_stories(session)
+        await seed_banners(session)
         products = await seed_catalog(session)
         zone = await get_settings_row(session)
         zone.delivery_cities = ["Москва"]

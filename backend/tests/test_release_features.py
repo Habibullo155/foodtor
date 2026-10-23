@@ -126,7 +126,13 @@ async def test_referral_program(client, db):
 async def test_banners_on_home(client, db):
     manager = await staff(client, db, SystemRole.MANAGER, "manager-ban@test.ru")
     picker = await staff(client, db, SystemRole.PICKER, "picker-ban@test.ru")
-    banner = {"title": "Неделя ягод", "text": "Клубника −20%", "button_label": "Смотреть", "link_url": "/promo"}
+    banner = {
+        "title": "Неделя ягод",
+        "text": "Клубника −20%",
+        "button_label": "Смотреть",
+        "link_url": "/promo",
+        "button_color": "white",
+    }
     assert (await client.post("/api/v1/admin/banners", headers=picker, json=banner)).status_code == 403
     bad = await client.post("/api/v1/admin/banners", headers=manager, json=banner | {"link_url": "javascript:alert(1)"})
     assert bad.status_code == 422
@@ -134,6 +140,9 @@ async def test_banners_on_home(client, db):
     b = (await client.post("/api/v1/admin/banners", headers=manager, json=banner | {"title": "Скрытый", "is_active": False})).json()
     home = (await client.get("/")).text
     assert "Неделя ягод" in home and "Скрытый" not in home and 'href="/promo"' in home
+    assert "banner__btn--white" in home
+    bad_color = await client.post("/api/v1/admin/banners", headers=manager, json=banner | {"button_color": "pink"})
+    assert bad_color.status_code == 422
     assert [x["title"] for x in (await client.get("/api/v1/banners")).json()] == ["Неделя ягод"]
     await client.put(f"/api/v1/admin/banners/{b['id']}", headers=manager, json=banner | {"title": "Осень"})
     await client.put("/api/v1/admin/banners-order", headers=manager, json={"ids": [b["id"], a["id"]]})

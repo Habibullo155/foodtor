@@ -25,6 +25,7 @@ class BannerIn(BaseModel):
     button_label: str | None = Field(default=None, max_length=40)
     link_url: str | None = Field(default=None, max_length=300, pattern=LINK)
     theme: Literal["green", "orange", "cream"] = "green"
+    button_color: Literal["orange", "green", "white", "dark"] = "orange"
     is_active: bool = True
     starts_at: datetime | None = None
     ends_at: datetime | None = None

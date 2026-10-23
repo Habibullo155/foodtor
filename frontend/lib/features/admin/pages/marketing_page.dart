@@ -166,15 +166,13 @@ class BannerPreview extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: b.theme == BannerTheme.orange
-                        ? Colors.white
-                        : AppColors.cta,
+                    color: b.buttonColor.background,
                     borderRadius: BorderRadius.circular(Radii.sm),
                   ),
                   child: Text(
                     label,
-                    style: const TextStyle(
-                      color: AppColors.onCta,
+                    style: TextStyle(
+                      color: b.buttonColor.foreground,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
@@ -300,6 +298,7 @@ class _BannerEditorState extends ConsumerState<_BannerEditor> {
   late final _link = TextEditingController(text: b?.linkUrl);
   late String? _image = b?.imageUrl;
   late BannerTheme _theme = b?.theme ?? BannerTheme.green;
+  late ButtonColor _buttonColor = b?.buttonColor ?? ButtonColor.orange;
   late bool _active = b?.isActive ?? true;
   late DateTime? _until = b?.endsAt;
   String? _error;
@@ -329,6 +328,7 @@ class _BannerEditorState extends ConsumerState<_BannerEditor> {
     buttonLabel: _button.text.trim().isEmpty ? null : _button.text.trim(),
     linkUrl: _link.text.trim().isEmpty ? null : _link.text.trim(),
     theme: _theme,
+    buttonColor: _buttonColor,
     isActive: _active,
     startsAt: b?.startsAt,
     endsAt: _until,
@@ -431,6 +431,44 @@ class _BannerEditorState extends ConsumerState<_BannerEditor> {
                   ),
                 ],
               ),
+              const Text(
+                'Цвет кнопки',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: Insets.sm),
+              Wrap(
+                spacing: Insets.sm,
+                runSpacing: Insets.sm,
+                children: [
+                  for (final c in ButtonColor.values)
+                    ChoiceChip(
+                      avatar: CircleAvatar(
+                        radius: 8,
+                        backgroundColor: c.background,
+                        child: c == ButtonColor.white
+                            ? const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.fromBorderSide(
+                                    BorderSide(color: Colors.black26),
+                                  ),
+                                ),
+                                child: SizedBox.square(dimension: 16),
+                              )
+                            : null,
+                      ),
+                      label: Text(c.label),
+                      selected: _buttonColor == c,
+                      onSelected: (_) => setState(() => _buttonColor = c),
+                    ),
+                ],
+              ),
+              const SizedBox(height: Insets.md),
+              const Text(
+                'Куда ведёт кнопка',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: Insets.sm),
               Wrap(
                 spacing: 6,
                 children: [
