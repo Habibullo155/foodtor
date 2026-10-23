@@ -60,3 +60,8 @@ class ShopSettings(TimestampMixin, Base):
     legal_ogrn: Mapped[str] = mapped_column(String(15), default="", server_default="")
     legal_address: Mapped[str] = mapped_column(String(300), default="", server_default="")
 
+    # SEO: где доставляем («по Москве») — попадает в заголовки и описания страниц; коды подтверждения сайта
+    delivery_area: Mapped[str] = mapped_column(String(120), default="по Москве", server_default="по Москве")
+    yandex_verification: Mapped[str] = mapped_column(String(120), default="", server_default="")
+    google_verification: Mapped[str] = mapped_column(String(120), default="", server_default="")
+

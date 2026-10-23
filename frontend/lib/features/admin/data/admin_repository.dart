@@ -251,6 +251,7 @@ class ApiAdminRepository implements AdminRepository {
         'image_url': c.imageUrl,
         'is_visible': c.isVisible,
         'position': c.position,
+        'description': c.description,
       },
     );
     return c;

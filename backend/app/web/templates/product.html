@@ -11,12 +11,13 @@
   "image": abs_images,
   "description": description,
   "sku": p.sku,
-  "brand": {"@type": "Brand", "name": p.brand or shop_name},
+  "brand": ({"@type": "Brand", "name": p.brand} if p.brand else none),
+  "category": product.category.name if product.category else none,
   "offers": {"@type": "Offer", "priceCurrency": "RUB", "price": p.price.price|string,
              "availability": "https://schema.org/InStock" if p.in_stock else "https://schema.org/OutOfStock",
              "url": canonical},
   "aggregateRating": ({"@type": "AggregateRating", "ratingValue": p.rating, "reviewCount": p.reviews_count} if p.rating else none)
-}|tojson }}</script>
+}|compact|tojson }}</script>
 <script type="application/ld+json">{{ {
   "@context": "https://schema.org", "@type": "BreadcrumbList",
   "itemListElement": [

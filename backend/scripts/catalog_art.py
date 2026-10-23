@@ -180,6 +180,31 @@ def banner(codes: list[str]) -> Image.Image:
     return c
 
 
+def share_image() -> Image.Image:
+    """Превью ссылки в мессенджерах и соцсетях (og:image), 1200×630."""
+    c = Image.new("RGBA", (1200, 630), rgb("#0B5D3B") + (255,))
+    glow = Image.new("RGBA", c.size, (255, 255, 255, 0))
+    ImageDraw.Draw(glow).ellipse((620, 40, 1260, 680), fill=(255, 255, 255, 40))
+    c.alpha_composite(glow.filter(ImageFilter.GaussianBlur(60)))
+    for code, size, xy, ang in (
+        ("1f350", 220, (760, 200), -12),
+        ("1f347", 220, (1060, 190), 12),
+        ("1f34a", 190, (740, 460), 10),
+        ("1f34c", 200, (1080, 470), -10),
+        ("1f34e", 300, (910, 360), 0),
+    ):
+        place(c, code, size, xy, ang)
+    d = ImageDraw.Draw(c)
+    d.text((70, 170), "FOOD", font=ImageFont.truetype(FONT, 96), fill=(255, 255, 255))
+    food_w = d.textlength("FOOD", font=ImageFont.truetype(FONT, 96))
+    d.text((70 + food_w, 170), "TOR", font=ImageFont.truetype(FONT, 96), fill=rgb("#FFA726"))
+    small = ImageFont.truetype(FONT, 40)
+    d.text((72, 310), "Свежие фрукты и овощи", font=small, fill=(255, 255, 255))
+    d.text((72, 362), "с доставкой на дом", font=small, fill=(255, 255, 255))
+    d.text((72, 470), "foodtor.ru", font=ImageFont.truetype(FONT, 30), fill=(255, 255, 255, 170))
+    return c.convert("RGB")
+
+
 def fresh_image_name(name: str) -> str:
     return "p/" + hashlib.sha256(name.encode()).hexdigest()[:10] + ".webp"
 
@@ -212,6 +237,7 @@ def main() -> None:
                 save(img, OUT / rel)
     for i, (*_, codes) in enumerate(BANNERS, 1):
         save(banner(codes), OUT / "b" / f"{i}.webp")
+    share_image().save(OUT / "og.jpg", "JPEG", quality=88, optimize=True)
     print(f"Готово: {len(made)} картинок товаров, {len(CATEGORIES)} категорий, {len(BANNERS)} баннеров → {OUT}")
 
 

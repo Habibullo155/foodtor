@@ -237,9 +237,13 @@ class AdminCategory {
     this.isVisible = true,
     this.position = 0,
     this.productsCount = 0,
+    this.description = '',
   });
   final int id;
   final String name;
+
+  /// Текст на странице категории — для покупателей и поисковиков.
+  final String description;
 
   /// slug с сервера; у новой категории его ещё нет — берём из названия.
   final String? savedSlug;
@@ -261,6 +265,7 @@ class AdminCategory {
     isVisible: j['is_visible'] as bool? ?? true,
     position: j['position'] as int? ?? 0,
     productsCount: j['products_count'] as int? ?? 0,
+    description: j['description'] as String? ?? '',
   );
 
   AdminCategory copyWith({
@@ -269,6 +274,7 @@ class AdminCategory {
     bool clearImage = false,
     bool? isVisible,
     int? productsCount,
+    String? description,
   }) => AdminCategory(
     id,
     name ?? this.name,
@@ -277,6 +283,7 @@ class AdminCategory {
     isVisible: isVisible ?? this.isVisible,
     position: position,
     productsCount: productsCount ?? this.productsCount,
+    description: description ?? this.description,
   );
 }
 
@@ -946,6 +953,9 @@ class ShopSettings {
     this.legalInn = '',
     this.legalOgrn = '',
     this.legalAddress = '',
+    this.deliveryArea = 'по Москве',
+    this.yandexVerification = '',
+    this.googleVerification = '',
   });
 
   final String phone;
@@ -961,6 +971,11 @@ class ShopSettings {
   final String legalInn;
   final String legalOgrn;
   final String legalAddress;
+
+  /// «по Москве» — подставляется в заголовки страниц для поисковиков.
+  final String deliveryArea;
+  final String yandexVerification;
+  final String googleVerification;
 
   factory ShopSettings.fromJson(Map<String, dynamic> j) => ShopSettings(
     phone: j['contact_phone'] as String,
@@ -978,6 +993,9 @@ class ShopSettings {
     legalInn: j['legal_inn'] as String? ?? '',
     legalOgrn: j['legal_ogrn'] as String? ?? '',
     legalAddress: j['legal_address'] as String? ?? '',
+    deliveryArea: j['delivery_area'] as String? ?? '',
+    yandexVerification: j['yandex_verification'] as String? ?? '',
+    googleVerification: j['google_verification'] as String? ?? '',
   );
 
   Map<String, dynamic> toJson() => {
@@ -994,6 +1012,9 @@ class ShopSettings {
     'legal_inn': legalInn,
     'legal_ogrn': legalOgrn,
     'legal_address': legalAddress,
+    'delivery_area': deliveryArea,
+    'yandex_verification': yandexVerification,
+    'google_verification': googleVerification,
   };
 }
 

@@ -32,6 +32,7 @@ class Category(Base):
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
     image_url: Mapped[str | None] = mapped_column(String(1024))
     position: Mapped[int] = mapped_column(Integer, default=0)  # порядок в карусели
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")  # текст на странице категории
     # скрытая категория не видна на сайте вместе со всеми своими товарами — ассортимент готовят заранее
     is_visible: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 

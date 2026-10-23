@@ -162,6 +162,13 @@ class Legal:
 
 
 @dataclass(frozen=True, slots=True)
+class Seo:
+    area: str = "по Москве"
+    yandex: str = ""
+    google: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class ShopInfo:
     hours: WorkHours
     socials: Socials = field(default_factory=Socials)
@@ -169,6 +176,7 @@ class ShopInfo:
     delivery: DeliveryRules = field(default_factory=DeliveryRules)
     referral: ReferralRules = field(default_factory=ReferralRules)
     legal: Legal = field(default_factory=Legal)
+    seo: Seo = field(default_factory=Seo)
 
 
 DEFAULT = ShopInfo(WorkHours((0, 1, 2, 3, 4, 5), "10:00", "22:00"))
@@ -197,6 +205,7 @@ def from_row(row) -> ShopInfo:
             row.referral_enabled, row.referral_friend_amount, row.referral_inviter_amount, row.referral_min_order
         ),
         legal=Legal(row.legal_name, row.legal_inn, row.legal_ogrn, row.legal_address),
+        seo=Seo(row.delivery_area or "", row.yandex_verification or "", row.google_verification or ""),
     )
 
 

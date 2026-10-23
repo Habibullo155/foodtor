@@ -304,6 +304,7 @@ class AdminCategoryOut(BaseModel):
     image_url: str | None
     position: int
     is_visible: bool
+    description: str
     products_count: int = 0
 
 
@@ -326,6 +327,7 @@ class CategoryIn(BaseModel):
     image_url: str | None = Field(default=None, max_length=1024, pattern=r"^(https://|/media/|/static/)")
     position: int = 0
     is_visible: bool = True
+    description: str = Field(default="", max_length=5000)
 
 
 @router.post("/categories", status_code=201, dependencies=[guard(Permission.PRODUCTS_WRITE)])

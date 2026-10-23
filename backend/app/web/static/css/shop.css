@@ -194,6 +194,10 @@ textarea.input { resize: vertical; }
 .card:hover { box-shadow: var(--shadow); }
 .card__media { position: relative; display: block; aspect-ratio: 1; background: var(--muted-bg); padding: 12%; }
 .card__media img { width: 100%; height: 100%; object-fit: contain; }
+/* настоящие фото — во всю карточку; рисунки и вырезанные на белом — с полями */
+.card__media:has(img[src^="/media/"]) { padding: 0; overflow: hidden; }
+.card__media img[src^="/media/"] { object-fit: cover; transition: transform .3s; }
+.card:hover .card__media img[src^="/media/"] { transform: scale(1.04); }
 .card__badges { position: absolute; top: 8px; left: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
 .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; background: var(--text-2); }
 .tag--hit { background: var(--hit); color: var(--cta-text); } .tag--fresh { background: var(--fresh); } .tag--sale { background: var(--sale); } .tag--low { background: var(--warn); } .tag--opt { background: var(--brand-deep); }
@@ -238,6 +242,11 @@ textarea.input { resize: vertical; }
 .filter__list { max-height: 260px; overflow: auto; }
 .filters__actions { display: flex; gap: 8px; padding-top: 14px; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 24px; }
+.seo-text { margin: 40px 0 8px; padding: 28px 32px; border-radius: 24px; background: var(--muted-bg); max-width: 860px; }
+.seo-text h2 { font-size: 20px; margin: 0 0 12px; }
+.seo-text p { margin: 0 0 10px; line-height: 1.6; color: var(--text-2, var(--text)); }
+.seo-text p:last-child { margin-bottom: 0; }
+@media (max-width: 520px) { .seo-text { padding: 20px; border-radius: 20px; } }
 .empty { text-align: center; padding: 48px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .empty--page { min-height: 50vh; justify-content: center; }
 @media (max-width: 960px) {
@@ -250,6 +259,8 @@ textarea.input { resize: vertical; }
 .pdp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; align-items: start; }
 .pdp__image { position: relative; aspect-ratio: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 8%; }
 .pdp__image img { width: 100%; height: 100%; object-fit: contain; }
+.pdp__image:has(img[src^="/media/"]) { padding: 0; overflow: hidden; }
+.pdp__image img[src^="/media/"] { object-fit: cover; }
 .pdp__thumbs { display: flex; gap: 8px; margin-top: 8px; }
 .pdp__thumbs button { width: 64px; height: 64px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); padding: 4px; cursor: pointer; }
 .pdp__meta { margin-bottom: 8px; }

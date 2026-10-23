@@ -53,6 +53,9 @@ class _ShopSettingsCardsState extends ConsumerState<ShopSettingsCards> {
   late final _inn = TextEditingController(text: s.legalInn);
   late final _ogrn = TextEditingController(text: s.legalOgrn);
   late final _address = TextEditingController(text: s.legalAddress);
+  late final _area = TextEditingController(text: s.deliveryArea);
+  late final _yandex = TextEditingController(text: s.yandexVerification);
+  late final _google = TextEditingController(text: s.googleVerification);
   // как считать курьера: paid — всегда платно, threshold — бесплатно от суммы, free — всегда бесплатно
   late String _courierMode = s.freeFrom == null
       ? 'paid'
@@ -78,6 +81,9 @@ class _ShopSettingsCardsState extends ConsumerState<ShopSettingsCards> {
       _inn,
       _ogrn,
       _address,
+      _area,
+      _yandex,
+      _google,
     ]) {
       c.dispose();
     }
@@ -137,6 +143,9 @@ class _ShopSettingsCardsState extends ConsumerState<ShopSettingsCards> {
       legalInn: _inn.text.trim(),
       legalOgrn: _ogrn.text.trim(),
       legalAddress: _address.text.trim(),
+      deliveryArea: _area.text.trim(),
+      yandexVerification: verificationCode(_yandex.text),
+      googleVerification: verificationCode(_google.text),
     );
     try {
       s = await ref.read(adminRepositoryProvider).saveShopSettings(next);
@@ -365,6 +374,38 @@ class _ShopSettingsCardsState extends ConsumerState<ShopSettingsCards> {
                 'Реквизиты обязательны для оферты: без них покупатель не видит, с кем заключает договор.',
                 style: muted,
               ),
+              const SizedBox(height: Insets.xl),
+              Text(
+                'Поисковики',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: Insets.sm),
+              TextField(
+                controller: _area,
+                maxLength: 120,
+                decoration: const InputDecoration(
+                  labelText: 'Где доставляете',
+                  hintText: 'по Москве',
+                  helperText: 'Попадает в заголовки страниц: «Фрукты — купить с доставкой по Москве»',
+                ),
+              ),
+              const SizedBox(height: Insets.sm),
+              TextField(
+                controller: _yandex,
+                decoration: const InputDecoration(
+                  labelText: 'Код Яндекс.Вебмастера',
+                  helperText: 'Вставьте meta-тег целиком из webmaster.yandex.ru — возьмём из него код',
+                ),
+              ),
+              const SizedBox(height: Insets.sm),
+              TextField(
+                controller: _google,
+                decoration: const InputDecoration(
+                  labelText: 'Код Google Search Console',
+                  helperText:
+                      'Способ «HTML-тег» в search.google.com/search-console',
+                ),
+              ),
               const SizedBox(height: Insets.md),
               error,
               save,
@@ -374,4 +415,13 @@ class _ShopSettingsCardsState extends ConsumerState<ShopSettingsCards> {
       ],
     );
   }
+}
+
+/// Из `<meta name="yandex-verification" content="abc123" />` оставляем только `abc123`.
+String verificationCode(String input) {
+  final m = RegExp(r'content\s*=\s*"([^"]*)"').firstMatch(input);
+  return (m?.group(1) ?? input).trim().replaceAll(
+    RegExp(r'[^A-Za-z0-9_\-]'),
+    '',
+  );
 }

@@ -224,6 +224,10 @@ class ShopSettingsIO(BaseModel):
     legal_inn: str = Field(default="", pattern=r"^(\d{10}|\d{12})?$")
     legal_ogrn: str = Field(default="", pattern=r"^(\d{13}|\d{15})?$")
     legal_address: str = Field(default="", max_length=300)
+    delivery_area: str = Field(default="по Москве", max_length=120)
+    # из кода подтверждения берём только значение content="…" — его и вставляем в <meta>
+    yandex_verification: str = Field(default="", max_length=120, pattern=r"^[A-Za-z0-9_\-]*$")
+    google_verification: str = Field(default="", max_length=120, pattern=r"^[A-Za-z0-9_\-]*$")
 
 
 SHOP_FIELDS = tuple(ShopSettingsIO.model_fields)

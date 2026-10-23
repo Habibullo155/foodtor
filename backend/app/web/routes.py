@@ -81,6 +81,8 @@ def stories_json(stories) -> list[dict]:
 
 
 templates.env.filters["rub"] = rub
+# JSON-LD без пустых полей: валидаторы поисковиков ругаются на "brand": null
+templates.env.filters["compact"] = lambda d: {k: v for k, v in d.items() if v is not None}
 templates.env.globals.update(
     plural=plural,
     asset=asset,
@@ -100,6 +102,20 @@ def site_url(request: Request, path: str, query: str = "") -> str:
     return site_base(request) + path + (f"?{query}" if query else "")
 
 
+def _area() -> str:
+    """« по Москве» — регион доставки из настроек магазина, для заголовков и описаний."""
+    area = shop_info.current().seo.area.strip()
+    return f" {area}" if area else ""
+
+
+def _clip(text: str, limit: int = 160) -> str:
+    """Мета-описание: поисковики показывают ~160 символов — режем по слову."""
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rsplit(" ", 1)[0].rstrip(",.:;—- ") + "…"
+
+
 def render(request: Request, name: str, status_code: int = 200, **ctx) -> HTMLResponse:
     s = get_settings()
     info = shop_info.current()
@@ -117,6 +133,7 @@ def render(request: Request, name: str, status_code: int = 200, **ctx) -> HTMLRe
             "delivery": info.delivery,
             "referral": info.referral,
             "legal": info.legal,
+            "seo": info.seo,
             "online_payment": s.payments_enabled,
             **ctx,
         },
@@ -153,9 +170,9 @@ async def home(request: Request, session: SessionDep):
         stories=stories,
         banners=banners,
         filters=data.Filters(),
-        title=f"{get_settings().shop_name} — овощи, фрукты и бакалея с доставкой",
-        description="Свежие овощи, фрукты, ягоды и бакалея с доставкой на дом. Доставляем в удобное время, "
-        "оплата при получении.",
+        title=f"{get_settings().shop_name} — доставка фруктов и овощей{_area()}",
+        description=f"Свежие фрукты, овощи, ягоды, зелень и мёд с доставкой на дом{_area()}. "
+        "Отбираем каждое утро, привозим в удобное время, оплата при получении.",
     )
 
 
@@ -199,10 +216,15 @@ async def _catalog_page(
         filters=f,
         page=result,
         categories=await data.categories(session),
-        title=f"{title}{f' — страница {result.page}' if result.page > 1 else ''} — купить с доставкой | "
+        title=f"{title}{f' — страница {result.page}' if result.page > 1 else ''} — купить с доставкой{_area()} | "
         f"{get_settings().shop_name}",
         heading=title,
-        description=f"{title}: {result.total} {plural(result.total, 'товар', 'товара', 'товаров')} с доставкой на дом.",
+        description=_clip(
+            (category.description if category and category.description else "")
+            or f"{title} с доставкой на дом{_area()}: {result.total} "
+            f"{plural(result.total, 'товар', 'товара', 'товаров')}. Свежее, отобранное утром, оплата при получении."
+        ),
+        og_image=absolute(request, category.image_url) if category and category.image_url else None,
         canonical=page_url(result.page) if clean else page_url(1),
         prev_url=page_url(result.page - 1) if clean and result.page > 1 else None,
         next_url=page_url(result.page + 1) if clean and result.page < result.pages else None,
@@ -257,10 +279,13 @@ async def product_page(request: Request, session: SessionDep, product_ref: str):
         reviews=await data.product_reviews(session, product.id),
         title=f"{product.name}{', ' + product.unit if product.unit else ''} — купить за {rub(summary.price.price)} | "
         f"{get_settings().shop_name}",
-        description=(
+        description=_clip(
             product.description
-            or f"{product.name} {product.unit or ''} от {product.brand or 'производителя'}. Доставка за 2 часа."
-        )[:160],
+            or f"{product.name}{', ' + product.unit if product.unit else ''} за {rub(summary.price.price)} "
+            f"с доставкой на дом{_area()}. "
+            + (f"{product.category.name} — отбираем каждое утро. " if product.category else "")
+            + "Оплата при получении."
+        ),
         og_image=absolute(request, summary.image_url) if summary.image_url else None,
         og_type="product",
     )
@@ -364,6 +389,8 @@ async def robots(request: Request):
     return (
         "User-agent: *\nDisallow: /cart\nDisallow: /checkout\nDisallow: /account\nDisallow: /login\n"
         "Disallow: /search\nDisallow: /api/\nDisallow: /*?*sort=\nDisallow: /*?*brand=\n"
+        # Яндекс: метки рекламы и реферальный код не создают новых страниц
+        "Clean-param: ref&utm_source&utm_medium&utm_campaign&utm_content&utm_term\n"
         f"Sitemap: {base}/sitemap.xml\n"
     )
 
@@ -373,18 +400,30 @@ async def sitemap(request: Request, session: SessionDep):
     base = site_base(request)
     cats, prods = await data.all_for_sitemap(session)
 
-    def url(loc: str, lastmod=None, prio: str = "0.6") -> str:
+    def url(loc: str, lastmod=None, prio: str = "0.6", image: str | None = None, caption: str = "") -> str:
         mod = f"<lastmod>{lastmod.date().isoformat()}</lastmod>" if lastmod else ""
-        return f"<url><loc>{escape(loc)}</loc>{mod}<priority>{prio}</priority></url>"
+        img = (
+            f"<image:image><image:loc>{escape(absolute(request, image))}</image:loc>"
+            f"<image:title>{escape(caption)}</image:title></image:image>"
+            if image
+            else ""
+        )
+        return f"<url><loc>{escape(loc)}</loc>{mod}<priority>{prio}</priority>{img}</url>"
 
     body = url(f"{base}/", prio="1.0") + url(f"{base}/catalog", prio="0.9")
     body += url(f"{base}/promo", prio="0.8") + url(f"{base}/business", prio="0.5") + url(f"{base}/support", prio="0.3")
-    body += "".join(url(f"{base}/catalog/{c.slug}", prio="0.8") for c in cats)
-    body += "".join(url(base + data.product_url(p), p.updated_at) for p in prods)
+    body += "".join(url(f"{base}/catalog/{c.slug}", prio="0.8", image=c.image_url, caption=c.name) for c in cats)
+    body += "".join(
+        url(base + data.product_url(p), p.updated_at, image=p.images[0].url if p.images else None, caption=p.name)
+        for p in prods
+    )
     body += "".join(
         url(f"{base}/info/{s}", prio="0.3") for s in ("about", "delivery", "payment", "returns", "contacts", "offer", "privacy")
     )
-    xml = f'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{body}</urlset>'
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" '
+        f'xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">{body}</urlset>'
+    )
     return Response(xml, media_type="application/xml")
 
 

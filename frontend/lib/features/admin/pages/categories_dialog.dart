@@ -142,6 +142,7 @@ class _CategoryEditor extends ConsumerStatefulWidget {
 
 class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
   late final _name = TextEditingController(text: widget.category?.name);
+  late final _text = TextEditingController(text: widget.category?.description);
   late String? _photo = widget.category?.imageUrl;
   late bool _visible = widget.category?.isVisible ?? true;
   bool _busy = false;
@@ -149,6 +150,7 @@ class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
   @override
   void dispose() {
     _name.dispose();
+    _text.dispose();
     super.dispose();
   }
 
@@ -171,6 +173,7 @@ class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
         imageUrl: _photo,
         clearImage: _photo == null,
         isVisible: _visible,
+        description: _text.text.trim(),
       ),
     );
     if (!mounted) return;
@@ -180,6 +183,7 @@ class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
     title: Text(widget.category == null ? 'Новая категория' : 'Категория'),
     content: SizedBox(
       width: 440,
@@ -194,6 +198,18 @@ class _CategoryEditorState extends ConsumerState<_CategoryEditor> {
             decoration: const InputDecoration(
               labelText: 'Название',
               hintText: 'Например, «Молочные продукты»',
+            ),
+          ),
+          TextField(
+            controller: _text,
+            minLines: 3,
+            maxLines: 6,
+            maxLength: 5000,
+            decoration: const InputDecoration(
+              labelText: 'Описание',
+              alignLabelWithHint: true,
+              helperText: 'Показывается под товарами и в поиске Яндекса и Google. Первые 160 символов — самые важные',
+              helperMaxLines: 2,
             ),
           ),
           const SizedBox(height: Insets.sm),

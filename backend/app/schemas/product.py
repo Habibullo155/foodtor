@@ -88,8 +88,9 @@ class CategoryImportRow(BaseModel):
     is_visible: bool | None = None
     position: Annotated[int, Field(ge=0, le=10_000)] | None = None
     image_url: Annotated[str, StringConstraints(max_length=1024)] | None = None
+    description: Annotated[str, StringConstraints(max_length=5000)] | None = None
 
-    @field_validator("image_url", mode="before")
+    @field_validator("image_url", "description", mode="before")
     @classmethod
     def _blank_to_none(cls, v: object) -> object:
         return ProductImportRow._blank_to_none(v)

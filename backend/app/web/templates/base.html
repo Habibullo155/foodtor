@@ -17,7 +17,10 @@
   <meta property="og:title" content="{{ title or shop_name }}">
   <meta name="twitter:card" content="summary_large_image">
   {% if description %}<meta property="og:description" content="{{ description }}">{% endif %}
-  {% if og_image %}<meta property="og:image" content="{{ og_image }}">{% endif %}
+  <meta property="og:image" content="{{ og_image or base_url ~ 'static/catalog/og.jpg' }}">
+  {% if not og_image %}<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">{% endif %}
+  {% if seo.yandex %}<meta name="yandex-verification" content="{{ seo.yandex }}">{% endif %}
+  {% if seo.google %}<meta name="google-site-verification" content="{{ seo.google }}">{% endif %}
   {% if prev_url %}<link rel="prev" href="{{ prev_url }}">{% endif %}
   {% if next_url %}<link rel="next" href="{{ next_url }}">{% endif %}
   <meta name="theme-color" content="#0B5D3B">

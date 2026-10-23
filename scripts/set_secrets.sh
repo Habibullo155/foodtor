@@ -14,7 +14,7 @@ if [[ ! -f $FILE ]]; then
   exit 1
 fi
 
-KEYS=(SMSRU_API_ID SMS_SENDER SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER SMTP_PASSWORD SMTP_FROM GEOCODER_CONTACT_EMAIL)
+KEYS=(SMSRU_API_ID SMS_SENDER SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USER SMTP_PASSWORD SMTP_FROM GEOCODER_CONTACT_EMAIL PEXELS_API_KEY)
 pairs=""
 for key in "${KEYS[@]}"; do
   value=$(grep -E "^$key=" "$FILE" | tail -1 | cut -d= -f2- || true)
@@ -92,6 +92,10 @@ if s.smtp_host and s.smtp_password:
 else:
     print("  Почта: SMTP не задан")
 PY
+if grep -q '^PEXELS_API_KEY=.' "$ENV"; then
+  echo "▶ Фото товаров с Pexels (только там, где пока рисунок; несколько минут)"
+  $compose exec -T api python -m scripts.fetch_photos | tail -5
+fi
 echo "✅ Готово. Прежняя версия настроек: $ENV.bak"
 REMOTE
 } | ssh "$HOST" "bash -s"

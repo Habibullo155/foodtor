@@ -41,3 +41,13 @@ async def test_replace_loads_catalog_with_hidden_groceries(client, db):
     assert found == []
 
     assert await load(db, replace=False) == 0  # повторный запуск ничего не дублирует
+
+
+def test_every_product_has_a_photo_query():
+    from scripts.fetch_photos import CATEGORY_QUERIES, query_for
+    from scripts.foodtor_catalog import CATEGORIES
+
+    names = [n for g in (FRESH, HIDDEN) for items in g.values() for n, *_ in items]
+    assert [n for n in names if query_for(n) is None] == []
+    assert {slug for slug, *_ in CATEGORIES} <= set(CATEGORY_QUERIES)
+    assert query_for("Помидоры сливовидные грунтовые") == "plum tomatoes"

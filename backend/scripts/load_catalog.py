@@ -17,7 +17,7 @@ from sqlalchemy import delete, select
 from app.db.session import SessionFactory
 from app.models import Banner, Category, Product, ProductImage
 from scripts.catalog_art import product_image
-from scripts.foodtor_catalog import BANNERS, CATEGORIES, FRESH, HIDDEN, HITS, our_price
+from scripts.foodtor_catalog import BANNERS, CATEGORIES, CATEGORY_TEXT, FRESH, HIDDEN, HITS, our_price
 
 STATIC = "/static/catalog/"
 STOCK = 50
@@ -38,6 +38,8 @@ async def load(s, replace: bool) -> int:
                 slug=slug, name=name, position=pos, is_visible=visible, image_url=f"{STATIC}c/{slug}.webp"
             )
             s.add(cats[slug])
+        if not cats[slug].description:
+            cats[slug].description = CATEGORY_TEXT.get(slug, "")
     await s.flush()
 
     existing = {p.name.lower() for p in (await s.scalars(select(Product))).unique().all()}

@@ -52,6 +52,7 @@ CATEGORY_COLUMNS = {
     "Показывать на сайте": "is_visible",
     "Порядок": "position",
     "Фото": "image_url",
+    "Описание": "description",
 }
 CATEGORY_ALIASES = {
     **{k.lower(): v for k, v in CATEGORY_COLUMNS.items()},
@@ -265,6 +266,8 @@ class ProductImportService:
                 cat.is_visible = row.is_visible
             if row.position is not None:
                 cat.position = row.position
+            if row.description is not None:
+                cat.description = row.description
             if row.image_url:
                 if images.is_own(row.image_url):
                     cat.image_url = urlparse(row.image_url).path
@@ -320,6 +323,7 @@ class ProductImportService:
                 "Показывать на сайте": "да" if c.is_visible else "нет",
                 "Порядок": c.position,
                 "Фото": f"{base}{c.image_url}" if c.image_url and c.image_url.startswith("/") else c.image_url,
+                "Описание": c.description,
             }
             for c in cats
         ]
@@ -346,7 +350,7 @@ def _write_dataframe(records: list[dict[str, Any]], fmt: FileFormat, cat_records
             cats = pd.DataFrame.from_records(list(cat_records), columns=list(CATEGORY_COLUMNS)).map(_neutralize_formula)
             cats.to_excel(writer, index=False, sheet_name=CATEGORIES_SHEET)
             sheet = writer.sheets[CATEGORIES_SHEET]
-            for col, width in zip("ABCD", (28, 20, 10, 50), strict=True):
+            for col, width in zip("ABCDE", (28, 20, 10, 50, 80), strict=True):
                 sheet.column_dimensions[col].width = width
             sheet.freeze_panes = "A2"
     else:

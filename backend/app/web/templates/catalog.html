@@ -40,6 +40,12 @@
     {% else %}
       <div class="empty">{{ icon('search', 'ic ic--xl') }}<h2>Ничего не нашли</h2><p class="muted">Попробуйте другой запрос или сбросьте фильтры</p><a class="btn btn--primary" href="/catalog">Весь каталог</a></div>
     {% endif %}
+    {% if filters.category and filters.category.description and page.page == 1 and not filters.active %}
+    <section class="seo-text">
+      <h2>{{ filters.category.name }} с доставкой{% if seo.area %} {{ seo.area }}{% endif %}</h2>
+      {% for para in filters.category.description.split('\n') if para.strip() %}<p>{{ para }}</p>{% endfor %}
+    </section>
+    {% endif %}
   </section>
 </div>
 {% endblock %}

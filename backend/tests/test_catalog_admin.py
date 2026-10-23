@@ -22,7 +22,7 @@ async def test_hidden_category_hides_its_products_everywhere(client, db):
     assert names == ["Яблоки"]
     assert (await client.get(f"/api/v1/products/{rice.id}")).status_code == 404
     assert (await client.get(f"/catalog/{grocery.slug}")).status_code == 404
-    assert "Поиск «Рис»: 0 товаров" in (await client.get("/catalog", params={"q": "Рис"})).text
+    assert "Поиск «Рис» <span class=\"muted\">0</span>" in (await client.get("/catalog", params={"q": "Рис"})).text
 
     owner = await staff(client, db, SystemRole.OWNER, "owner-cat@test.ru")
     admin = (await client.get("/api/v1/admin/categories", headers=owner)).json()
