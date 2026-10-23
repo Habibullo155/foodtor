@@ -16,6 +16,7 @@ import 'pages/delivery_page.dart';
 import 'pages/picking_page.dart';
 import 'pages/stories_page.dart';
 import 'rbac.dart';
+import 'widgets/notifications_button.dart';
 import 'widgets/profile_dialog.dart';
 import '../../core/theme/theme_mode.dart';
 
@@ -142,6 +143,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
           wide: c.maxWidth >= 760,
           section: current,
           showMenu: !desktop && sections.length > 1,
+          onOpen: go,
         );
 
         if (desktop) {
@@ -434,21 +436,17 @@ class _TopBar extends ConsumerWidget {
     required this.section,
     required this.showMenu,
     required this.wide,
+    required this.onOpen,
   });
   final AdminSection section;
   final bool showMenu;
+  final ValueChanged<AdminSection> onOpen;
   final bool wide; // по ширине места (LayoutBuilder), а не окна
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final text = Theme.of(context).textTheme;
     final session = ref.watch(adminAuthProvider);
-    final newOrders = ref.watch(
-      adminOrdersProvider.select(
-        (o) => o.where((x) => x.stage == OrderStage.newOrder).length,
-      ),
-    );
-
     return Container(
       height: 72,
       padding: const EdgeInsets.symmetric(horizontal: Insets.xl),
@@ -504,16 +502,7 @@ class _TopBar extends ConsumerWidget {
             ),
           const SizedBox(width: Insets.sm),
           const ThemeModeButton(),
-          IconButton(
-            tooltip: 'Уведомления',
-            onPressed: () {},
-            icon: Badge.count(
-              count: newOrders,
-              isLabelVisible: newOrders > 0,
-              backgroundColor: AppColors.lowStock,
-              child: const Icon(Icons.notifications_none_rounded),
-            ),
-          ),
+          NotificationsButton(onOpen: onOpen),
           if (session != null)
             PopupMenuButton<String>(
               tooltip: session.name,

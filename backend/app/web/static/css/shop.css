@@ -571,8 +571,8 @@ dialog::backdrop { background: rgba(15, 23, 42, .5); }
 .bubble__who { display: block; font-size: 12px; opacity: .8; margin-bottom: 2px; }
 .bubble p { margin: 0; white-space: pre-wrap; }
 .bubble time { display: block; font-size: 11px; opacity: .7; margin-top: 4px; }
-.footer__support { margin: 10px 0 0; background: rgba(255,255,255,.12); color: #fff; display: inline-flex; gap: 6px; align-items: center; }
-.footer__support .ic { width: 16px; height: 16px; }
+.account__support { display: flex !important; align-items: center; gap: 8px; margin-top: 8px; background: var(--brand-soft); color: var(--brand) !important; font-weight: 600; border-radius: var(--radius-sm); }
+.account__support .ic { width: 18px; height: 18px; }
 .badge-count--inline { position: static; margin-left: 6px; }
 
 @media (max-width: 900px) {

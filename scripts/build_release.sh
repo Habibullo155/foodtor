@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 # Релизная сборка админки (Flutter) в deploy/web/admin. Магазин собирать не нужно: его HTML-страницы
 # отдаёт сам бэкенд (backend/app/web). Админка ходит в API на своём же домене (/api) — Caddy проксирует.
-#   SHOP_NAME="Свежая лавка" SUPPORT_PHONE="+7 (999) 000-00-00" SUPPORT_EMAIL=help@shop.ru ./scripts/build_release.sh
+#   ./scripts/build_release.sh
 set -euo pipefail
 cd "$(dirname "$0")/../frontend"
 
 DEFINES=(
   --dart-define=APP_MODE=release
-  --dart-define=SHOP_NAME="${SHOP_NAME:-SaaS Shop}"
-  --dart-define=SUPPORT_PHONE="${SUPPORT_PHONE:-+7 (000) 000-00-00}"
-  --dart-define=SUPPORT_EMAIL="${SUPPORT_EMAIL:-support@example.com}"
+  --dart-define=SHOP_NAME="${SHOP_NAME:-FOODTOR}"
 )
 
 echo "▶ Проверки бэкенда (сайт магазина + API)"

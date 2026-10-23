@@ -12,7 +12,7 @@
       <a href="#profile" data-section-link="profile">Профиль</a>
       <a href="#settings" data-section-link="settings">Настройки</a>
       {% if referral.enabled %}<a href="/friends">Приведи друга</a>{% endif %}
-      <a href="/support">Поддержка <span class="badge-count badge-count--inline" data-support-unread hidden></span></a>
+      <a class="account__support" href="/support">{{ icon('headset') }} Написать в поддержку <span class="badge-count badge-count--inline" data-support-unread hidden></span></a>
       <button class="link link--danger" type="button" data-logout>Выйти</button>
     </nav>
   </aside>

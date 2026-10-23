@@ -94,7 +94,7 @@ class Settings(BaseSettings):
     def sms_enabled(self) -> bool:
         return (
             self.sms_provider == "smsru"
-            and self.smsru_api_id is not None
+            and bool(self.smsru_api_id and self.smsru_api_id.get_secret_value())
             or (self.sms_provider == "console" and not self.is_prod)
         )
 

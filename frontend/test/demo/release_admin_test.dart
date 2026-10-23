@@ -140,6 +140,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('bell lists what needs attention and opens the section', (
+    tester,
+  ) async {
+    final c = await pumpAdmin(tester, const Size(1440, 1000));
+    await login(tester, c, 'owner@saasshop.local');
+    await tester.runAsync(
+      () => c.read(supportThreadsProvider.notifier).reload(),
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Уведомления'));
+    await settle(tester);
+    expect(find.text('Ждут вашего внимания'), findsOneWidget);
+    expect(find.text('Вопросы в поддержке'), findsOneWidget);
+    expect(find.text('Заявки компаний'), findsOneWidget);
+    await tester.tap(find.text('Вопросы в поддержке'));
+    await settle(tester);
+    expect(find.text('Мария Кузнецова'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final (name, page) in [
     ('marketing', const MarketingPage()),
     ('support', const SupportPage()),

@@ -1,7 +1,7 @@
 {% macro wordmark() %}{% if shop_name|upper == 'FOODTOR' %}<span class="logo__food">FOOD</span><span class="logo__tor">TOR</span>{% else %}{{ shop_name }}{% endif %}{% endmacro %}{% macro social_links(socials) %}{% if socials.links %}<div class="socials">
   {% if socials.telegram %}<a href="{{ socials.telegram }}" target="_blank" rel="noopener"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-telegram"/></svg>Telegram</a>{% endif %}
   {% if socials.instagram %}<a href="{{ socials.instagram }}" target="_blank" rel="noopener"><svg class="ic"><use href="{{ asset('icons.svg') }}#i-instagram"/></svg>Instagram*</a>{% endif %}
-</div>{% endif %}{% endmacro %}{% macro icon_svg(name) %}<svg class="ic"><use href="{{ asset('icons.svg') }}#i-{{ name }}"/></svg>{% endmacro %}<!doctype html>
+</div>{% endif %}{% endmacro %}<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -75,8 +75,7 @@
         <a href="/business">Оптовые цены</a><a href="/business#apply">Оставить заявку</a></nav>
       <nav aria-label="Документы"><h3>Документы</h3>
         <a href="/info/offer">Публичная оферта</a><a href="/info/privacy">Политика конфиденциальности</a></nav>
-      <div><h3>Мы на связи</h3><p class="muted"><a href="tel:{{ contacts.tel }}">{{ contacts.phone }}</a>{% if contacts.email %}<br><a href="mailto:{{ contacts.email }}">{{ contacts.email }}</a>{% endif %}<br>{{ hours.text|capitalize }}</p>
-        <a class="btn btn--sm footer__support" href="/support">{{ icon_svg('chat') }} Написать в поддержку</a>{{ social_links(socials) }}</div>
+      <div><h3>Мы на связи</h3><p class="muted"><a href="tel:{{ contacts.tel }}">{{ contacts.phone }}</a>{% if contacts.email %}<br><a href="mailto:{{ contacts.email }}">{{ contacts.email }}</a>{% endif %}<br>{{ hours.text|capitalize }}</p>{{ social_links(socials) }}</div>
     </div>
     <div class="wrap footer__bottom muted">© {{ year() }} {{ shop_name }}{% if legal.filled %} · {{ legal.name }}, ИНН {{ legal.inn }}{% if legal.ogrn %}, ОГРН {{ legal.ogrn }}{% endif %}{% endif %}{% if socials.instagram %}<p class="footer__note">* Instagram — продукт компании Meta, признанной экстремистской организацией и запрещённой в России.</p>{% endif %}</div>
   </footer>
